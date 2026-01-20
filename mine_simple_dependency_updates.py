@@ -196,6 +196,17 @@ class SimpleDependencyMiner:
         
         return file
 
+    def _is_content_line(self, line: str) -> bool:
+        """
+        Check if a patch line is a content line (not a special marker).
+        
+        Returns True for context lines and False for special markers like:
+        - \\ No newline at end of file
+        - --- file headers
+        - +++ file headers
+        """
+        return not line.startswith('\\') and not line.startswith('---') and not line.startswith('+++')
+
     def extract_version_change(self, patch: str) -> Optional[Dict[str, Any]]:
         """
         Extracts the line change and checks if it's a version increase.
@@ -222,7 +233,7 @@ class SimpleDependencyMiner:
                 added_line = line[1:]  # Remove the '+' prefix
                 added_line_number = current_line
                 current_line += 1
-            elif not line.startswith('\\') and not line.startswith('---') and not line.startswith('+++'):  # Ignore "\ No newline at end of file" and file markers
+            elif self._is_content_line(line):
                 current_line += 1
         
         if not removed_line or not added_line:
@@ -248,18 +259,27 @@ class SimpleDependencyMiner:
         }
 
     def _extract_version(self, line: str) -> Optional[str]:
-        """Extract version string from a line."""
-        # Common patterns for version numbers in gradle and toml files
-        # Examples: 
-        # - version = "1.2.3"
-        # - implementation("com.example:lib:1.2.3")
-        # - someLib = "1.2.3"
+        """
+        Extract version string from a line.
         
-        # Try to find semantic version pattern
+        Supports common version patterns in gradle and toml files:
+        - Quoted versions: "1.2.3" or '1.2.3'
+        - Colon-prefixed versions: :1.2.3"
+        - Assignment versions: = 1.2.3
+        
+        Examples:
+        - implementation("com.example:lib:1.2.3")
+        - version = "2.0.0"
+        - someLib = '1.5.2-alpha'
+        - androidxCore = "1.10.0"
+        """
         patterns = [
-            r'["\'](\d+\.\d+(?:\.\d+)?(?:[.-][a-zA-Z0-9]+)?)["\']',  # "1.2.3" or '1.2.3'
-            r':(\d+\.\d+(?:\.\d+)?(?:[.-][a-zA-Z0-9]+)?)["\']',      # :1.2.3"
-            r'=\s*(\d+\.\d+(?:\.\d+)?(?:[.-][a-zA-Z0-9]+)?)(?:\s|$)', # = 1.2.3
+            # Matches "1.2.3" or '1.2.3' (with quotes)
+            r'["\'](\d+\.\d+(?:\.\d+)?(?:[.-][a-zA-Z0-9]+)?)["\']',
+            # Matches :1.2.3" (colon prefix with quote)
+            r':(\d+\.\d+(?:\.\d+)?(?:[.-][a-zA-Z0-9]+)?)["\']',
+            # Matches = 1.2.3 (assignment without quotes)
+            r'=\s*(\d+\.\d+(?:\.\d+)?(?:[.-][a-zA-Z0-9]+)?)(?:\s|$)',
         ]
         
         for pattern in patterns:
@@ -270,19 +290,27 @@ class SimpleDependencyMiner:
         return None
 
     def _is_version_increase(self, from_version: str, to_version: str) -> bool:
-        """Check if to_version is greater than from_version."""
-        # Parse version strings
-        def parse_version(v: str) -> tuple:
-            # Split on dots and dashes
+        """
+        Check if to_version is greater than from_version.
+        
+        Uses simple numeric comparison for the main version parts.
+        Handles versions with different lengths and pre-release identifiers.
+        
+        Note: This is a simplified version comparison. For more complex
+        scenarios, consider using packaging.version.parse().
+        """
+        def parse_version(v: str) -> list:
+            """Parse version string into list of comparable parts."""
+            # Split on dots and dashes to handle versions like "1.2.3-alpha"
             parts = re.split(r'[.-]', v)
-            numeric_parts = []
+            result = []
             for part in parts:
                 if part.isdigit():
-                    numeric_parts.append(int(part))
+                    result.append(int(part))
                 else:
-                    # For non-numeric parts (like 'alpha', 'beta'), keep as string
-                    numeric_parts.append(part)
-            return tuple(numeric_parts)
+                    # For non-numeric parts (like 'alpha', 'beta'), keep as lowercase string
+                    result.append(part.lower())
+            return result
         
         try:
             from_parts = parse_version(from_version)
@@ -291,21 +319,26 @@ class SimpleDependencyMiner:
             # Compare element by element
             max_len = max(len(from_parts), len(to_parts))
             for i in range(max_len):
+                # Pad with 0 for numeric parts, empty string for non-numeric
                 from_val = from_parts[i] if i < len(from_parts) else 0
                 to_val = to_parts[i] if i < len(to_parts) else 0
                 
-                # If both are integers, compare numerically
+                # Both are integers - compare numerically
                 if isinstance(from_val, int) and isinstance(to_val, int):
                     if to_val > from_val:
                         return True
                     elif to_val < from_val:
                         return False
-                # If one is string, do string comparison
-                elif str(to_val) > str(from_val):
-                    return True
-                elif str(to_val) < str(from_val):
-                    return False
+                # One or both are strings - convert both to strings and compare
+                else:
+                    from_str = str(from_val)
+                    to_str = str(to_val)
+                    if to_str > from_str:
+                        return True
+                    elif to_str < from_str:
+                        return False
             
+            # All parts are equal
             return False
         except Exception as e:
             print(f"Error comparing versions {from_version} vs {to_version}: {e}")

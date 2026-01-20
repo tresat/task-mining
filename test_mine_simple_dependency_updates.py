@@ -92,6 +92,16 @@ class TestSimpleDependencyMiner(unittest.TestCase):
         self.assertFalse(self.miner._is_version_increase("2.0.0", "1.9.9"))
         self.assertFalse(self.miner._is_version_increase("1.0.0", "1.0.0"))
 
+    def test_is_content_line(self):
+        # Test content line detection
+        self.assertTrue(self.miner._is_content_line("    implementation(...)"))
+        self.assertTrue(self.miner._is_content_line(" some code"))
+        self.assertTrue(self.miner._is_content_line(""))
+        
+        self.assertFalse(self.miner._is_content_line("\\ No newline at end of file"))
+        self.assertFalse(self.miner._is_content_line("--- a/file.txt"))
+        self.assertFalse(self.miner._is_content_line("+++ b/file.txt"))
+
     def test_extract_version_change(self):
         # Test extracting version change from a patch
         patch = """@@ -10,1 +10,1 @@
