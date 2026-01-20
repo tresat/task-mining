@@ -27,6 +27,19 @@ This project mines GitHub repositories for "Self-Correction" pairs (Bad Commit -
   python3 mine_fixes.py android/nowinandroid --limit 100
   ```
 
+### 1b. `mine_simple_dependency_updates.py` (The Simple Dependency Miner)
+**Function**: Identifies simple single-line dependency version updates.
+- **Logic**: Scans individual commits (not PRs) for single-line dependency version increases in `build.gradle`, `build.gradle.kts`, or `libs.versions.toml` files where both the commit and its parent have successful builds.
+- **Input**: GitHub Repo (owner/name)
+- **Output**: `results/simple_dependency_updates.json`
+- **Usage**:
+  ```bash
+  python3 mine_simple_dependency_updates.py android/nowinandroid --limit 1000
+  ```
+- **Output Format**: Similar to `mining_results.json` but with:
+  - `from_commit` / `to_commit` instead of `bad_commit` / `good_commit`
+  - Additional fields: `changed_file`, `changed_line_number`, `from_line_contents`, `to_line_contents`
+
 ### 2. `analyze_pairs.py` (The Heuristic Classifier)
 **Function**: Classifies pairs based on changed files (Fast & Cheap).
 - **Logic**: Checks if `build.gradle`, `libs.versions.toml`, or other build files were modified.
@@ -50,13 +63,17 @@ This project mines GitHub repositories for "Self-Correction" pairs (Bad Commit -
   ```
 
 ## Resumability
-Both `mine_fixes.py` and `gemini_classifier.py` support resuming if interrupted.
+Multiple scripts support resuming if interrupted.
 
-- **Mining**: Uses a state file (default `mining_state.json`) to save the cursor.
+- **mine_fixes.py**: Uses a state file (default `mining_state.json`) to save the cursor.
   - To resume: Just run the same command again.
   - To restart: Delete `mining_state.json` and `mining_results.json`.
 
-- **AI Classification**: Checks `ai_classified_results.json` for existing entries.
+- **mine_simple_dependency_updates.py**: Uses a state file (default `simple_dependency_state.json`) to save the cursor.
+  - To resume: Just run the same command again.
+  - To restart: Delete `simple_dependency_state.json` and `results/simple_dependency_updates.json`.
+
+- **gemini_classifier.py**: Checks `ai_classified_results.json` for existing entries.
   - To resume: Run the command again; it skips already classified pairs.
   - To restart: Delete `ai_classified_results.json`.
 
