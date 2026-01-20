@@ -205,7 +205,7 @@ class SimpleDependencyMiner:
         
         removed_line = None
         added_line = None
-        line_number = 0
+        added_line_number = 0
         
         # Parse the patch to find the changed line
         current_line = 0
@@ -215,13 +215,14 @@ class SimpleDependencyMiner:
                 # Format: @@ -old_start,old_count +new_start,new_count @@
                 match = re.search(r'@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@', line)
                 if match:
-                    current_line = int(match.group(1)) - 1
+                    current_line = int(match.group(1))
             elif line.startswith('-') and not line.startswith('---'):
                 removed_line = line[1:]  # Remove the '-' prefix
             elif line.startswith('+') and not line.startswith('+++'):
                 added_line = line[1:]  # Remove the '+' prefix
+                added_line_number = current_line
                 current_line += 1
-            elif not line.startswith('\\'):  # Ignore "\ No newline at end of file"
+            elif not line.startswith('\\') and not line.startswith('---') and not line.startswith('+++'):  # Ignore "\ No newline at end of file" and file markers
                 current_line += 1
         
         if not removed_line or not added_line:
@@ -239,7 +240,7 @@ class SimpleDependencyMiner:
             return None
         
         return {
-            "line_number": current_line,
+            "line_number": added_line_number,
             "from_line": removed_line,
             "to_line": added_line,
             "from_version": from_version,
