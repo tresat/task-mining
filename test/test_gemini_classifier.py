@@ -196,7 +196,7 @@ class TestGeminiClassifier(unittest.TestCase):
 index abc123..def456 100644
 --- a/gradle/libs.versions.toml
 +++ b/gradle/libs.versions.toml
-@@ -60 +60 @@
+@@ -60,1 +60,1 @@
 -roborazzi = "1.51.0"
 +roborazzi = "1.56.0"
 """
