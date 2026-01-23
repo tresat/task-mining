@@ -5,10 +5,10 @@ This project mines GitHub repositories for "Self-Correction" pairs (Bad Commit -
 ## Project Structure
 
 - `/mining` - Mining scripts for extracting data from repositories
-  - `mine_prs.py` - Mines PR-based commit pairs (formerly mine_fixes.py)
-  - `mine_dep_update_commits.py` - Mines single-line dependency updates (formerly mine_simple_dependency_updates.py)
+  - `mine_prs.py` - Mines PR-based commit pairs (bad->good)
+  - `mine_commits.py` - Mines commit pairs with successful builds
   - `cache.py` - GitHub API caching system
-  - `mine_common.py` - Shared utilities for mining scripts (formerly common.py)
+  - `mine_common.py` - Shared utilities for mining scripts
 - `/classification` - Classification and analysis scripts
   - `simple_classifier.py` - Heuristic classification of mining results (formerly analyze_pairs.py)
   - `gemini_classifier.py` - AI-powered classification using Gemini
@@ -30,13 +30,13 @@ The mining scripts use a comprehensive caching system to improve performance and
 ### How It Works
 1. **Cache Location**: `.cache/{owner}_{name}/` directory (hidden, gitignored)
 2. **Cache Structure**: 
-   - PRs: `prs_cache.json` (for `mine_fixes.py`)
-   - Commits: `commits_cache.json` (for `mine_simple_dependency_updates.py`)
+   - PRs: `prs_cache.json` (for `mine_prs.py`, max 100 items)
+   - Commits: `commits_cache.json` (for `mine_commits.py`, max 1000 items)
 3. **Cache Priming** (automatic first step):
    - Fetches list of recent PR/commit IDs from GitHub
    - For each ID (most to least recent): checks if full details are in cache
    - If not cached: fetches full details and adds to cache
-   - Stops when: (a) finding an ID already in cache, OR (b) reaching 100 items in cache
+   - Stops when: (a) finding an ID already in cache, OR (b) reaching max items (100 for PRs, 1000 for commits)
 4. **Mining with Cache**:
    - First reads data from cache (fast, no API calls)
    - When cache is exhausted: fetches next batch from GitHub and caches it
@@ -156,8 +156,8 @@ python3 -m reporting.build_dashboard
 
 **Parameters:**
 - **Mining Types** (`--type`): Controls Step 1
-  - `fixes` (default): PR-based bad->good commit pairs
-  - `simple-dep-updates`: Single-line dependency updates only
+  - `prs` (default): PR-based bad->good commit pairs
+  - `commits`: Commit pairs with successful builds (mines ALL pairs where both parent and child have successful builds)
 - **Classification Options** (`--classifier`): Controls Steps 2 and 2b, runs on the results from Step 1
   - `simple` (default): Heuristic classification only (fast)
   - `ai`: AI classification with Gemini (automatically runs simple as prerequisite)
@@ -180,53 +180,53 @@ python3 -m reporting.build_dashboard
 - **Usage (Single Repo)**:
   ```bash
   # Search through 100 PRs
-  python3 run_pipeline.py android/nowinandroid --search-limit 100 --type fixes
+  python3 run_pipeline.py android/nowinandroid --search-limit 100 --type prs
   
   # Find 50 valid pairs
-  python3 run_pipeline.py android/nowinandroid --results-limit 50 --type fixes
+  python3 run_pipeline.py android/nowinandroid --results-limit 50 --type prs
   
   # Search through 200 PRs or until 50 valid pairs found (whichever comes first)
-  python3 run_pipeline.py android/nowinandroid --search-limit 200 --results-limit 50 --type fixes
+  python3 run_pipeline.py android/nowinandroid --search-limit 200 --results-limit 50 --type prs
   
   # Run with custom timeout (5 minutes)
-  python3 run_pipeline.py android/nowinandroid --search-limit 100 --type fixes --timeout 300
+  python3 run_pipeline.py android/nowinandroid --search-limit 100 --type prs --timeout 300
   
   # Run with clean (deletes all previous results first, but keeps cache)
-  python3 run_pipeline.py android/nowinandroid --search-limit 100 --type fixes --clean
+  python3 run_pipeline.py android/nowinandroid --search-limit 100 --type prs --clean
   
   # Run with cache clean (clears cache before running)
-  python3 run_pipeline.py android/nowinandroid --search-limit 100 --type fixes --clean-cache
+  python3 run_pipeline.py android/nowinandroid --search-limit 100 --type prs --clean-cache
   
   # Complete clean (results, state, and cache)
-  python3 run_pipeline.py android/nowinandroid --search-limit 100 --type fixes --clean --clean-cache
+  python3 run_pipeline.py android/nowinandroid --search-limit 100 --type prs --clean --clean-cache
   
   # Run only simple classification (default)
-  python3 run_pipeline.py android/nowinandroid --search-limit 100 --type fixes
+  python3 run_pipeline.py android/nowinandroid --search-limit 100 --type prs
   
   # Run with AI classification (simple runs automatically as prerequisite)
-  python3 run_pipeline.py android/nowinandroid --search-limit 100 --type fixes --classifier ai
+  python3 run_pipeline.py android/nowinandroid --search-limit 100 --type prs --classifier ai
   
-  # Run simple-dep-updates mining with simple classification
-  python3 run_pipeline.py android/nowinandroid --results-limit 100 --type simple-dep-updates
+  # Run commits mining with simple classification
+  python3 run_pipeline.py android/nowinandroid --results-limit 100 --type commits
   
-  # Run simple-dep-updates with AI classification
-  python3 run_pipeline.py android/nowinandroid --results-limit 100 --type simple-dep-updates --classifier ai
+  # Run commits with AI classification
+  python3 run_pipeline.py android/nowinandroid --results-limit 100 --type commits --classifier ai
   ```
 - **Usage (Multi-Repo)**:
   Create a file `repos.txt` with one repo per line, then:
   ```bash
   # Process multiple repos with 2-minute timeout per repo (default)
-  python3 run_pipeline.py repos.txt --search-limit 100 --type fixes --clean
+  python3 run_pipeline.py repos.txt --search-limit 100 --type prs --clean
   
-  # Process simple-dep-updates with longer timeout for slow repos
-  python3 run_pipeline.py repos.txt --search-limit 100 --type simple-dep-updates --timeout 600
+  # Process commits with longer timeout for slow repos
+  python3 run_pipeline.py repos.txt --search-limit 100 --type commits --timeout 600
   
   # Clean cache before processing multiple repos
-  python3 run_pipeline.py repos.txt --search-limit 100 --type fixes --clean-cache
+  python3 run_pipeline.py repos.txt --search-limit 100 --type prs --clean-cache
   ```
   Results will be saved in `results/per_repo/{owner}_{name}.json`, and aggregated into `results/results.json` at the end.
 
-### 1. `mining/mine_fixes.py` (The Fixes Miner)
+### 1. `mining/mine_prs.py` (The PR Miner)
 **Function**: Identifies "Self-Correction" pairs in merged PRs.
 - **Logic**: Scans PRs for a sequence of `Failure -> Success` commits.
 - **Input**: GitHub Repo (owner/name) OR a text file with a list of repos (one per line)
@@ -234,28 +234,32 @@ python3 -m reporting.build_dashboard
 - **State Files**: Stored in `.state/{owner}_{name}_mining_state.json`
 - **Usage (Single Repo)**:
   ```bash
-  python3 -m mining.mine_fixes android/nowinandroid --limit 100
+  python3 -m mining.mine_prs android/nowinandroid --search-limit 100 --results-limit 50
   ```
 - **Usage (Multi-Repo)**:
   ```bash
-  python3 -m mining.mine_fixes repos.txt --limit 100
+  python3 -m mining.mine_prs repos.txt --search-limit 100 --results-limit 50
   ```
 
-### 1b. `mining/mine_simple_dependency_updates.py` (The Simple Dependency Miner)
-**Function**: Identifies simple single-line dependency version updates.
-- **Logic**: Scans individual commits (not PRs) for single-line dependency version increases in `build.gradle`, `build.gradle.kts`, or `libs.versions.toml` files where both the commit and its parent have successful builds.
+### 1b. `mining/mine_commits.py` (The Commit Miner)
+**Function**: Mines commit pairs where both parent and child have successful builds.
+- **Logic**: Scans individual commits (not PRs) for pairs where both the commit and its parent have successful builds. Does NOT filter by file type or change type - mines ALL successful build pairs.
+- **Classification**: The simple_classifier adds tags for specific patterns:
+  - `one-line`: Single-line changes in dependency files
+  - `version-update`: Version increases detected
+  - Files_changed is populated by the classifier
 - **Branch Detection**: Automatically detects the default branch (tries `main` first, then `master`).
 - **Input**: GitHub Repo (owner/name) OR a text file with a list of repos (one per line)
 - **Output**: `results/per_repo/{owner}_{name}.json` with date fields and null category fields
-- **State Files**: Stored in `.state/{owner}_{name}_simple_dependency_state.json`
+- **State Files**: Stored in `.state/{owner}_{name}_commit_pairs_state.json`
 - **Usage (Single Repo)**:
   ```bash
-  python3 -m mining.mine_simple_dependency_updates android/nowinandroid --limit 1000
+  python3 -m mining.mine_commits android/nowinandroid --search-limit 1000 --results-limit 100
   ```
 - **Usage (Multi-Repo)**:
   Create a file `repos.txt` with one repo per line, then:
   ```bash
-  python3 -m mining.mine_simple_dependency_updates repos.txt --limit 1000
+  python3 -m mining.mine_commits repos.txt --search-limit 1000 --results-limit 100
   ```
   Results will be saved in `results/per_repo/{owner}_{name}.json`.
 
@@ -264,10 +268,16 @@ python3 -m reporting.build_dashboard
 - **Logic**: 
   - Checks if `libs.versions.toml` was modified
   - Checks if changes occurred within `dependencies {}` blocks in `build.gradle` or `build.gradle.kts` files
+  - Checks if exactly one line changed in a dependency file
+  - Checks if version increased
   - Only sets Category = "Dependency Update" if ONLY `libs.versions.toml` was changed
-  - Adds "dependencies" tag if any dependency-related changes were found
+  - Adds tags:
+    - "dependencies" tag if any dependency-related changes were found
+    - "one-line" tag if exactly one line changed in a dependency file
+    - "version-update" tag if version increased
+  - Populates files_changed with line-level details when version-update detected
 - **Categories**: Only tags things as `Dependency Update` vs others (leaves category null for non-pure dependency changes)
-- **Tags**: Adds "dependencies" tag when applicable
+- **Tags**: Adds "dependencies", "one-line", "version-update" tags when applicable
 - **Input**: `results/per_repo/{owner}_{name}.json` (auto-detected from repo name)
 - **Output**: Updates the same file in-place, setting the `category` field and adding to `tags` array
 - **Usage**:
@@ -294,11 +304,11 @@ python3 -m reporting.build_dashboard
 ## Resumability
 All mining scripts support resuming if interrupted.
 
-- **mining/mine_fixes.py**: Uses state files in the `.state/` directory (e.g., `.state/{owner}_{name}_mining_state.json`).
+- **mining/mine_prs.py**: Uses state files in the `.state/` directory (e.g., `.state/{owner}_{name}_mining_state.json`).
   - To resume: Just run the same command again.
   - To restart: Delete the corresponding state file in `.state/` and the results in `results/per_repo/{owner}_{name}.json`.
 
-- **mining/mine_dep_update_commits.py**: Uses state files in the `.state/` directory (e.g., `.state/{owner}_{name}_simple_dependency_state.json`).
+- **mining/mine_commits.py**: Uses state files in the `.state/` directory (e.g., `.state/{owner}_{name}_commit_pairs_state.json`).
   - To resume: Just run the same command again.
   - To restart: Delete the corresponding state file in `.state/` and the results in `results/per_repo/{owner}_{name}.json`.
 
