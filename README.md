@@ -48,7 +48,15 @@ All mining scripts now use a **unified JSON format** to ensure consistency:
 ## Scripts
 
 ### 0. `run_pipeline.py` (The All-in-One)
-**Function**: Runs the entire pipeline (Mining -> Classification).
+**Function**: Runs the entire pipeline: Token Validation -> Mining -> Classification.
+
+**Pipeline Steps:**
+- **Step 0**: Token Validation - Validates that required environment tokens (GITHUB_TOKEN, GEMINI_API_KEY) are set
+- **Step 1**: Mining - Extracts data based on `--type` parameter
+- **Step 2**: Simple/Heuristic Classification - Analyzes mining results
+- **Step 2b**: AI Classification - Deepens analysis using Gemini (requires GEMINI_API_KEY)
+
+**Parameters:**
 - **Mining Types** (`--type`): Controls Step 1
   - `fixes` (default): PR-based bad->good commit pairs
   - `simple-dep-updates`: Single-line dependency updates only

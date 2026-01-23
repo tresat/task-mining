@@ -4,6 +4,7 @@ import sys
 import os
 import signal
 from contextlib import contextmanager
+from mining.common import load_env
 
 @contextmanager
 def timeout_context(seconds, repo_name):
@@ -33,28 +34,16 @@ def run_step(command, description):
         print(f"Error during '{description}': {e}")
         sys.exit(1)
 
-def process_repo(repo, search_limit, results_limit, mining_type, classifier, timeout_seconds):
-    print(f"\n{'#'*60}")
-    print(f"PROCESSING REPO: {repo}")
-    print(f"{'#'*60}\n")
+def run_mining(repo, search_limit, results_limit, mining_type, output_dir, state_dir):
+    """
+    Run Step 1: Mining based on the specified type.
     
-    if "/" not in repo:
-        print(f"Skipping invalid repo format: {repo}")
-        return
-
-    owner, name = repo.split("/", 1)
-    output_dir = os.path.join("results", f"{owner}_{name}")
-    state_dir = "state"
-    os.makedirs(output_dir, exist_ok=True)
-    os.makedirs(state_dir, exist_ok=True)
-    
+    Returns:
+        Path to the mining output file to use for classification, or None
+    """
     # Define filenames within the repo-specific directory
     mining_output = os.path.join(output_dir, "mining_results.json")
-    mining_state = os.path.join(state_dir, f"{owner}_{name}_mining_state.json")
     simple_dep_output = os.path.join(output_dir, "simple_dependency_updates.json")
-    simple_dep_state = os.path.join(state_dir, f"{owner}_{name}_simple_dependency_state.json")
-    analyzed_output = os.path.join(output_dir, "analyzed_results.json")
-    ai_output = os.path.join(output_dir, "ai_classified_results.json")
     
     # Build limit arguments
     limit_args = []
@@ -92,15 +81,27 @@ def process_repo(repo, search_limit, results_limit, mining_type, classifier, tim
         # For 'both', we'll classify the fixes mining results
         classification_input = mining_output
     
+    return classification_input
+
+def run_classification(repo, classifier, classification_input, output_dir):
+    """
+    Run Steps 2 and 2b: Classification based on the specified classifier.
+    """
+    if not classification_input:
+        return
+    
+    analyzed_output = os.path.join(output_dir, "analyzed_results.json")
+    ai_output = os.path.join(output_dir, "ai_classified_results.json")
+    
     # Step 2: Simple/Heuristic Classification (runs on any mining type)
-    if classifier in ["simple", "both"] and classification_input:
+    if classifier in ["simple", "both"]:
         run_step(
             ["python3", "-m", "classification.analyze_pairs", repo, "--input", classification_input, "--output", analyzed_output],
             f"Step 2: Running Simple/Heuristic Classification for {repo}"
         )
     
     # Step 2b: AI Classification (runs on any mining type)
-    if classifier in ["ai", "both"] and classification_input:
+    if classifier in ["ai", "both"]:
         # AI classifier needs analyzed results, so run simple first if not already run
         if classifier == "ai":
             run_step(
@@ -111,6 +112,68 @@ def process_repo(repo, search_limit, results_limit, mining_type, classifier, tim
             ["python3", "-m", "classification.gemini_classifier", repo, "--input", analyzed_output, "--output", ai_output],
             f"Step 2b: Running AI Classification (Gemini) for {repo}"
         )
+
+def process_repo(repo, search_limit, results_limit, mining_type, classifier, timeout_seconds):
+    print(f"\n{'#'*60}")
+    print(f"PROCESSING REPO: {repo}")
+    print(f"{'#'*60}\n")
+    
+    if "/" not in repo:
+        print(f"Skipping invalid repo format: {repo}")
+        return
+
+    owner, name = repo.split("/", 1)
+    output_dir = os.path.join("results", f"{owner}_{name}")
+    state_dir = "state"
+    os.makedirs(output_dir, exist_ok=True)
+    os.makedirs(state_dir, exist_ok=True)
+    
+    # Step 1: Mining
+    classification_input = run_mining(repo, search_limit, results_limit, mining_type, output_dir, state_dir)
+    
+    # Steps 2 and 2b: Classification
+    run_classification(repo, classifier, classification_input, output_dir)
+
+def validate_tokens(classifier):
+    """
+    Step 0: Validate that required tokens are set.
+    
+    Args:
+        classifier: The classifier type to determine which tokens are needed
+    """
+    print(f"\n{'='*60}")
+    print("Step 0: Validating Environment Tokens")
+    print(f"{'='*60}\n")
+    
+    missing_tokens = []
+    
+    # GITHUB_TOKEN is always required
+    github_token = os.getenv("GITHUB_TOKEN")
+    if not github_token:
+        missing_tokens.append("GITHUB_TOKEN")
+    else:
+        print("✓ GITHUB_TOKEN is set")
+    
+    # GEMINI_API_KEY is required if using AI classification
+    if classifier in ["ai", "both"]:
+        gemini_key = os.getenv("GEMINI_API_KEY")
+        if not gemini_key:
+            missing_tokens.append("GEMINI_API_KEY")
+        else:
+            print("✓ GEMINI_API_KEY is set")
+    
+    if missing_tokens:
+        print(f"\n❌ Error: The following required environment variables are not set:")
+        for token in missing_tokens:
+            print(f"   - {token}")
+        print("\nPlease ensure you have a .env file in the project root with these variables.")
+        print("Example .env format:")
+        print("GITHUB_TOKEN=your_github_token_here")
+        if classifier in ["ai", "both"]:
+            print("GEMINI_API_KEY=your_gemini_api_key_here")
+        sys.exit(1)
+    
+    print("\n✓ All required tokens are set\n")
 
 def main():
     parser = argparse.ArgumentParser(description="Run the full Task Mining Pipeline")
@@ -129,6 +192,10 @@ def main():
     # Validate that at least one limit is specified
     if not args.search_limit and not args.results_limit:
         parser.error("At least one of --search-limit or --results-limit must be specified")
+    
+    # Step 0: Load environment variables and validate tokens
+    load_env()
+    validate_tokens(args.classifier)
     
     # Clean entire results and state directories if requested (done first, before processing any repos)
     if args.clean:

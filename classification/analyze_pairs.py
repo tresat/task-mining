@@ -4,19 +4,11 @@ import requests
 import argparse
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List, Dict, Any
+import sys
 
-def load_env():
-    """Simple .env loader."""
-    env_path = os.path.join(os.path.dirname(__file__), '.env')
-    if os.path.exists(env_path):
-        with open(env_path, 'r') as f:
-            for line in f:
-                line = line.strip()
-                if not line or line.startswith('#'):
-                    continue
-                if '=' in line:
-                    key, value = line.split('=', 1)
-                    os.environ[key.strip()] = value.strip()
+# Add parent directory to path to import from mining
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+from mining.common import load_env
 
 class PairAnalyzer:
     def __init__(self, token: str, repo_owner: str, repo_name: str):
