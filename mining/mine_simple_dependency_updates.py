@@ -497,6 +497,7 @@ class SimpleDependencyMiner:
                 
                 # Create result entry
                 result = {
+                    "repo_url": f"https://github.com/{self.owner}/{self.name}",
                     "from_commit": parent_oid,
                     "from_msg": "",  # We don't have parent message easily
                     "to_commit": oid,

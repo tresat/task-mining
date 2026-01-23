@@ -282,6 +282,7 @@ class GitHubMiner:
                             pair = {
                                 "pr_id": pr_number,
                                 "pr_url": pr["url"],
+                                "repo_url": f"https://github.com/{self.owner}/{self.name}",
                                 "from_commit": bad_commit["oid"],
                                 "from_msg": bad_commit["message"].split('\n')[0],
                                 "to_commit": oid,

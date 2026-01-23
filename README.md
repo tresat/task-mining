@@ -24,6 +24,7 @@ All mining scripts now use a **unified JSON format** to ensure consistency:
 {
   "pr_id": 123,
   "pr_url": "https://github.com/owner/repo/pull/123",
+  "repo_url": "https://github.com/owner/repo",
   "from_commit": "abc123",
   "from_msg": "Initial implementation",
   "to_commit": "def456",
@@ -40,6 +41,7 @@ All mining scripts now use a **unified JSON format** to ensure consistency:
 ```
 
 **Note:** 
+- `repo_url` contains the GitHub repository URL (e.g., `https://github.com/owner/repo`)
 - `files_changed` is always an array, even for single-file changes
 - For PR-based mining, `files_changed` is initially empty and can be populated by classification scripts
 - For commit-based mining, `files_changed` contains detailed line-level change information
