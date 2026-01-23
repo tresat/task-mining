@@ -565,9 +565,13 @@ def main():
 
     repos = []
     if os.path.isfile(args.repo_or_file):
-        with open(args.repo_or_file, 'r') as f:
-            repos = [line.strip() for line in f if line.strip() and not line.startswith("#")]
-        print(f"Loaded {len(repos)} repositories from {args.repo_or_file}")
+        try:
+            with open(args.repo_or_file, 'r') as f:
+                repos = [line.strip() for line in f if line.strip() and not line.startswith("#")]
+            print(f"Loaded {len(repos)} repositories from {args.repo_or_file}")
+        except (IOError, PermissionError, FileNotFoundError) as e:
+            print(f"Error reading file {args.repo_or_file}: {e}")
+            return
     else:
         repos = [args.repo_or_file]
     
