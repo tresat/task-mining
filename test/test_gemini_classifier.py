@@ -39,7 +39,6 @@ class TestGeminiClassifier(unittest.TestCase):
         # Example PR (for testing backward compatibility)
         self.test_pr = {
             "pr_id": 123,
-            "pr_url": "https://github.com/owner/repo/pull/123",
             "from_commit": "abc123",
             "from_msg": "Initial implementation",
             "to_commit": "def456",

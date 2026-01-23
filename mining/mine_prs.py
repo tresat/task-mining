@@ -260,7 +260,6 @@ class GitHubMiner:
                             bad_commit = last_bad_commit["commit"]
                             pair = {
                                 "pr_id": pr_number,
-                                "pr_url": pr_data["url"],
                                 "repo_url": f"https://github.com/{self.owner}/{self.name}",
                                 "from_commit": bad_commit["oid"],
                                 "from_msg": bad_commit["message"].split('\n')[0],
@@ -361,7 +360,6 @@ class GitHubMiner:
                             bad_commit = last_bad_commit["commit"]
                             pair = {
                                 "pr_id": pr_number,
-                                "pr_url": pr["url"],
                                 "repo_url": f"https://github.com/{self.owner}/{self.name}",
                                 "from_commit": bad_commit["oid"],
                                 "from_msg": bad_commit["message"].split('\n')[0],

@@ -61,7 +61,6 @@ All mining scripts now use a **unified JSON format** with date fields and catego
 ```json
 {
   "pr_id": 123,
-  "pr_url": "https://github.com/owner/repo/pull/123",
   "repo_url": "https://github.com/owner/repo",
   "from_commit": "abc123",
   "from_msg": "Initial implementation",
