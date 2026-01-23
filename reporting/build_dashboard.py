@@ -380,6 +380,12 @@ def generate_dashboard_html(raw_data):
 
         <div class="controls">
             <div class="control-group">
+                <label for="repoFilter">Repository:</label>
+                <select id="repoFilter" onchange="updateDisplay()">
+                    <option value="ALL">ALL</option>
+                </select>
+            </div>
+            <div class="control-group">
                 <label for="groupBy">Group By:</label>
                 <select id="groupBy" onchange="updateDisplay()">
                     <option value="category">Category</option>
@@ -429,27 +435,53 @@ def generate_dashboard_html(raw_data):
 
         let chart = null;
         let currentGroupBy = 'category';
+        let currentRepoFilter = 'ALL';
+
+        function initializeRepoFilter() {{
+            const repos = new Set(rawData.map(r => r.repo_url));
+            const repoFilter = document.getElementById('repoFilter');
+            
+            // Add ALL option (already in HTML)
+            // Add each repository
+            repos.forEach(repo => {{
+                const option = document.createElement('option');
+                option.value = repo;
+                // Extract repo name from URL for display
+                const repoName = repo.replace('https://github.com/', '');
+                option.textContent = repoName;
+                repoFilter.appendChild(option);
+            }});
+        }}
+
+        function getFilteredData() {{
+            if (currentRepoFilter === 'ALL') {{
+                return rawData;
+            }}
+            return rawData.filter(r => r.repo_url === currentRepoFilter);
+        }}
 
         function updateDisplay() {{
             currentGroupBy = document.getElementById('groupBy').value;
+            currentRepoFilter = document.getElementById('repoFilter').value;
             updateStats();
             updateChart();
             displayResults();
         }}
 
         function updateStats() {{
-            const totalCount = rawData.length;
-            const repos = new Set(rawData.map(r => r.repo_url)).size;
+            const filteredData = getFilteredData();
+            const totalCount = filteredData.length;
+            const repos = new Set(filteredData.map(r => r.repo_url)).size;
             
             let groups = new Set();
             if (currentGroupBy === 'category') {{
-                rawData.forEach(r => {{
+                filteredData.forEach(r => {{
                     if (r.category) {{
                         groups.add(r.category);
                     }}
                 }});
             }} else {{
-                rawData.forEach(r => {{
+                filteredData.forEach(r => {{
                     if (r.tags && Array.isArray(r.tags)) {{
                         r.tags.forEach(tag => groups.add(tag));
                     }}
@@ -463,17 +495,18 @@ def generate_dashboard_html(raw_data):
 
         function updateChart() {{
             const ctx = document.getElementById('distributionChart').getContext('2d');
+            const filteredData = getFilteredData();
             
             // Count by group
             const counts = {{}};
             
             if (currentGroupBy === 'category') {{
-                rawData.forEach(r => {{
+                filteredData.forEach(r => {{
                     const cat = r.category || 'Uncategorized';
                     counts[cat] = (counts[cat] || 0) + 1;
                 }});
             }} else {{
-                rawData.forEach(r => {{
+                filteredData.forEach(r => {{
                     if (r.tags && Array.isArray(r.tags) && r.tags.length > 0) {{
                         r.tags.forEach(tag => {{
                             counts[tag] = (counts[tag] || 0) + 1;
@@ -528,18 +561,19 @@ def generate_dashboard_html(raw_data):
 
         function displayResults() {{
             const container = document.getElementById('resultsContainer');
+            const filteredData = getFilteredData();
             
-            if (rawData.length === 0) {{
+            if (filteredData.length === 0) {{
                 container.innerHTML = `
                     <div class="empty-state">
                         <h3>No Results</h3>
-                        <p>No mining results to display yet.</p>
+                        <p>No mining results to display for the selected filter.</p>
                     </div>
                 `;
                 return;
             }}
             
-            container.innerHTML = rawData.map(result => {{
+            container.innerHTML = filteredData.map(result => {{
                 const repoName = result.repo_url ? result.repo_url.split('/').slice(-2).join('/') : 'Unknown';
                 const prUrl = result.pr_id && result.repo_url ? 
                     `${{result.repo_url}}/pull/${{result.pr_id}}` : null;
@@ -604,6 +638,7 @@ def generate_dashboard_html(raw_data):
         }}
 
         // Initialize on load
+        initializeRepoFilter();
         updateDisplay();
     </script>
 </body>
