@@ -43,7 +43,9 @@ def build_dashboard(results_file="results/results.json", output_file="results/da
     try:
         with open(output_file, 'w') as f:
             f.write(html_content)
-        print(f"✓ Dashboard created at {output_file}")
+        # Get absolute path for IDE compatibility
+        abs_path = os.path.abspath(output_file)
+        print(f"✓ Dashboard created at file://{abs_path}")
     except Exception as e:
         print(f"Error writing dashboard: {e}")
 

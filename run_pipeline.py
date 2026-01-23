@@ -23,11 +23,12 @@ def timeout_context(seconds, repo_name):
         signal.alarm(0)
         signal.signal(signal.SIGALRM, old_handler)
 
-def run_step(command, description):
-    print(f"\n{'='*60}")
-    print(f"STEP: {description}")
-    print(f"CMD: {' '.join(command)}")
-    print(f"{'='*60}\n")
+def run_step(command, description, show_header=True):
+    if show_header:
+        print(f"\n{'='*60}")
+        print(f"STEP: {description}")
+        print(f"CMD: {' '.join(command)}")
+        print(f"{'='*60}\n")
     
     try:
         subprocess.run(command, check=True)
@@ -54,9 +55,7 @@ def prime_cache_for_repo(repo, mining_type):
         print("Error: GITHUB_TOKEN not found")
         return
     
-    print(f"\n{'='*60}")
-    print(f"CACHE PRIMING: {repo}")
-    print(f"{'='*60}\n")
+    print(f"\n*** CACHE PRIMING: {repo} ***\n")
     
     if mining_type == "fixes":
         from mining.mine_prs import GitHubMiner
@@ -108,19 +107,21 @@ def run_mining(repo, search_limit, results_limit, mining_type, output_dir, state
     if results_limit:
         limit_args.extend(["--results-limit", str(results_limit)])
     
-    # Step 1: Mine based on type
+    # Step 1: Mine based on type (no header output)
     classification_input = None
     
     if mining_type == "fixes":
         run_step(
             ["python3", "-m", "mining.mine_prs", repo] + limit_args + ["--output", "results", "--state", state_dir],
-            f"Step 1: Mining 'Bad -> Good' Pairs for {repo}"
+            f"Step 1: Mining 'Bad -> Good' Pairs for {repo}",
+            show_header=False
         )
         classification_input = per_repo_output
     elif mining_type == "simple-dep-updates":
         run_step(
             ["python3", "-m", "mining.mine_dep_update_commits", repo] + limit_args + ["--output", "results", "--state", state_dir],
-            f"Step 1: Mining Simple Dependency Updates for {repo}"
+            f"Step 1: Mining Simple Dependency Updates for {repo}",
+            show_header=False
         )
         classification_input = per_repo_output
     
@@ -154,9 +155,7 @@ def run_classification(repo, classifier, classification_input):
         )
 
 def process_repo(repo, search_limit, results_limit, mining_type, classifier, timeout_seconds):
-    print(f"\n{'#'*60}")
-    print(f"PROCESSING REPO: {repo}")
-    print(f"{'#'*60}\n")
+    print(f"\n*** PROCESSING REPO: {repo} ***\n")
     
     if "/" not in repo:
         print(f"Skipping invalid repo format: {repo}")
@@ -178,10 +177,6 @@ def aggregate_results():
     """
     Step 3: Aggregation - Combine all per_repo files into a single results.json
     """
-    print(f"\n{'='*60}")
-    print("Step 3: Aggregating Results")
-    print(f"{'='*60}\n")
-    
     per_repo_dir = os.path.join("results", "per_repo")
     output_file = os.path.join("results", "results.json")
     
@@ -226,10 +221,6 @@ def validate_tokens(classifier):
     Args:
         classifier: The classifier type to determine which tokens are needed
     """
-    print(f"\n{'='*60}")
-    print("Step 0: Validating Environment Tokens")
-    print(f"{'='*60}\n")
-    
     missing_tokens = []
     
     # GITHUB_TOKEN is always required
@@ -279,6 +270,10 @@ def main():
     if not args.search_limit and not args.results_limit:
         parser.error("At least one of --search-limit or --results-limit must be specified")
     
+    print(f"\n{'='*60}")
+    print("INITIALIZATION")
+    print(f"{'='*60}\n")
+    
     # Step 0: Load environment variables and validate tokens
     load_env()
     validate_tokens(args.classifier)
@@ -317,6 +312,8 @@ def main():
     repo_word = "repository" if len(repos) == 1 else "repositories"
     print(f"Processing {len(repos)} {repo_word} with {args.timeout} second timeout per repo\n")
     
+    print(f"{'='*60}\n")
+    
     # Prime cache for all repos first (with timeout protection)
     for repo in repos:
         try:
@@ -330,7 +327,11 @@ def main():
         except Exception as e:
             print(f"Failed to prime cache for {repo}: {e}")
             # Continue to next repo
-        
+    
+    print(f"\n{'='*60}")
+    print("PROCESSING REPOSITORIES")
+    print(f"{'='*60}\n")
+    
     for repo in repos:
         try:
             with timeout_context(args.timeout, repo):
@@ -345,12 +346,18 @@ def main():
             print(f"Failed to process {repo}: {e}")
             # Continue to next repo
     
+    print(f"\n{'='*60}")
+    print("GENERATING REPORT")
+    print(f"{'='*60}\n")
+    
     # Step 3: Aggregate all results into a single file
     aggregate_results()
     
     # Step 4: Build dashboard
     from reporting.build_dashboard import build_dashboard
     build_dashboard()
+    
+    print(f"\n{'='*60}\n")
             
     print("\nPipeline Complete!")
 

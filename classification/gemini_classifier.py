@@ -94,7 +94,7 @@ class GeminiClassifier:
                     return {"sub_category": None, "error": error_msg}
             else:
                 error_msg = f"{response.status_code}: {response.text}"
-                print(f"Gemini API Error {error_msg}")
+                print(f"Gemini API Error {response.status_code}")
                 return {"sub_category": None, "error": error_msg}
         except Exception as e:
             error_msg = f"Request error: {str(e)}"
