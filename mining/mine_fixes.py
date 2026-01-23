@@ -335,7 +335,7 @@ class GitHubMiner:
                 commits = self.get_all_commits_for_pr(pr)
                 
                 # Cache the PR data if cache manager is available
-                if cache_manager and cache_manager.size() < 100:
+                if cache_manager:
                     from .cache import MAX_CACHE_ITEMS
                     if cache_manager.size() < MAX_CACHE_ITEMS:
                         pr_data = pr.copy()
