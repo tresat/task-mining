@@ -415,6 +415,7 @@ class SimpleDependencyMiner:
             print(f"Resuming from cursor: {cursor}")
             
         processed_count = 0
+        initial_results_count = len(results)  # Track starting count for cache reporting
         
         # If using cache, try to mine from cache first
         if cache_manager:
@@ -510,7 +511,8 @@ class SimpleDependencyMiner:
             # Save results after cache mining
             with open(output_file, "w") as f:
                 json.dump(results, f, indent=2)
-            print(f"\nCache exhausted. Saved {len(results)} updates from cache.")
+            new_from_cache = len(results) - initial_results_count
+            print(f"\nCache exhausted. Found {new_from_cache} new updates from cache.")
             
             # If we've hit limits, return
             if results_limit and len(results) >= results_limit:
@@ -652,9 +654,7 @@ class SimpleDependencyMiner:
 
 def process_repo(repo: str, token: str, search_limit: Optional[int], results_limit: Optional[int], output_dir: str, state_dir: str, ref: Optional[str] = None, use_cache: bool = True):
     """Process a single repository with optional caching."""
-    print(f"\n{'#'*60}")
-    print(f"PROCESSING REPO: {repo}")
-    print(f"{'#'*60}\n")
+    print(f"\n*** PROCESSING REPO: {repo} ***")
     
     if "/" not in repo:
         print(f"Skipping invalid repo format: {repo}")
