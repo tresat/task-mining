@@ -381,9 +381,9 @@ class SimpleDependencyMiner:
         with open(state_file, 'w') as f:
             json.dump({"cursor": cursor}, f)
 
-    def mine(self, search_limit: Optional[int], results_limit: Optional[int], output_file: str, state_file: str, ref: str = "refs/heads/main") -> List[Dict[str, Any]]:
+    def mine(self, search_limit: Optional[int], results_limit: Optional[int], output_file: str, state_file: str, ref: str = "refs/heads/main", cache_manager=None) -> List[Dict[str, Any]]:
         """
-        Mines the repository for simple dependency update commits with resumability.
+        Mines the repository for simple dependency update commits with resumability and caching.
         
         Args:
             search_limit: Maximum number of commits to search through (None for unlimited)
@@ -391,6 +391,7 @@ class SimpleDependencyMiner:
             output_file: Path to output JSON file
             state_file: Path to state file for resumability
             ref: Git ref to scan
+            cache_manager: Optional CacheManager instance for commit caching
         """
         results = []
         
@@ -414,7 +415,105 @@ class SimpleDependencyMiner:
             
         processed_count = 0
         
-        # Continue until we hit either limit (if specified)
+        # If using cache, try to mine from cache first
+        if cache_manager:
+            print(f"\nMining from cache ({cache_manager.size()} commits available)...")
+            cached_commits = cache_manager.get_all()
+            
+            # Get commit OIDs sorted (most recent first based on cache order)
+            commit_oids = list(cached_commits.keys())
+            
+            for oid in commit_oids:
+                # Check results limit
+                if results_limit and len(results) >= results_limit:
+                    print(f"Reached results limit of {results_limit} updates.")
+                    with open(output_file, "w") as f:
+                        json.dump(results, f, indent=2)
+                    return results
+                
+                # Check search limit
+                if search_limit and processed_count >= search_limit:
+                    print(f"Reached search limit of {search_limit} commits.")
+                    with open(output_file, "w") as f:
+                        json.dump(results, f, indent=2)
+                    return results
+                
+                commit = cached_commits[oid]
+                msg = commit["message"].split('\n')[0]
+                
+                # Check if current commit has successful build
+                if not self.is_build_successful(commit):
+                    processed_count += 1
+                    continue
+                
+                # Check if parent commit has successful build
+                parents = commit.get("parents", {}).get("nodes", [])
+                if not parents:
+                    processed_count += 1
+                    continue
+                
+                parent = parents[0]
+                if not self.is_build_successful(parent):
+                    processed_count += 1
+                    continue
+                
+                parent_oid = parent["oid"]
+                
+                # Fetch the diff for this commit
+                commit_diff = self.get_commit_diff(oid)
+                if not commit_diff:
+                    processed_count += 1
+                    continue
+                
+                # Check if it's a single line change in a dependency file
+                file_info = self.is_single_line_change(commit_diff)
+                if not file_info:
+                    processed_count += 1
+                    continue
+                
+                # Extract version change
+                patch = file_info.get("patch", "")
+                version_change = self.extract_version_change(patch)
+                if not version_change:
+                    processed_count += 1
+                    continue
+                
+                # Create result entry
+                result = {
+                    "repo_url": f"https://github.com/{self.owner}/{self.name}",
+                    "from_commit": parent_oid,
+                    "from_msg": "",
+                    "to_commit": oid,
+                    "to_msg": msg,
+                    "files_changed": [{
+                        "filename": file_info.get("filename"),
+                        "line_number": version_change["line_number"],
+                        "from_line_contents": version_change["from_line"],
+                        "to_line_contents": version_change["to_line"]
+                    }]
+                }
+                
+                # Check for duplicates before adding
+                if not any(r['to_commit'] == oid for r in results):
+                    results.append(result)
+                    print(f"Found update: {parent_oid[:7]} -> {oid[:7]} in {file_info.get('filename')}")
+                
+                processed_count += 1
+            
+            # Save results after cache mining
+            with open(output_file, "w") as f:
+                json.dump(results, f, indent=2)
+            print(f"\nCache exhausted. Saved {len(results)} updates from cache.")
+            
+            # If we've hit limits, return
+            if results_limit and len(results) >= results_limit:
+                return results
+            if search_limit and processed_count >= search_limit:
+                return results
+            
+            print(f"Fetching more commits from GitHub...\n")
+        
+        # Continue with GitHub API queries
         while True:
             # Check results limit
             if results_limit and len(results) >= results_limit:
@@ -440,7 +539,7 @@ class SimpleDependencyMiner:
                 "limit": batch_size
             }
             
-            print(f"Fetching commits (cursor={cursor})...")
+            print(f"Fetching commits from GitHub (cursor={cursor})...")
             data = self._query(COMMITS_QUERY, variables)
             
             if not data.get("data") or not data["data"].get("repository"):
@@ -463,6 +562,10 @@ class SimpleDependencyMiner:
             for commit in nodes:
                 oid = commit["oid"]
                 msg = commit["message"].split('\n')[0]
+                
+                # Cache the commit if cache manager is available
+                if cache_manager and cache_manager.size() < 100:
+                    cache_manager.set(oid, commit)
                 
                 # Check if current commit has successful build
                 if not self.is_build_successful(commit):
@@ -499,7 +602,7 @@ class SimpleDependencyMiner:
                 result = {
                     "repo_url": f"https://github.com/{self.owner}/{self.name}",
                     "from_commit": parent_oid,
-                    "from_msg": "",  # We don't have parent message easily
+                    "from_msg": "",
                     "to_commit": oid,
                     "to_msg": msg,
                     "files_changed": [{
@@ -532,8 +635,8 @@ class SimpleDependencyMiner:
                 
         return results
 
-def process_repo(repo: str, token: str, search_limit: Optional[int], results_limit: Optional[int], output_dir: str, state_dir: str, ref: Optional[str] = None):
-    """Process a single repository."""
+def process_repo(repo: str, token: str, search_limit: Optional[int], results_limit: Optional[int], output_dir: str, state_dir: str, ref: Optional[str] = None, use_cache: bool = True):
+    """Process a single repository with optional caching."""
     print(f"\n{'#'*60}")
     print(f"PROCESSING REPO: {repo}")
     print(f"{'#'*60}\n")
@@ -560,6 +663,13 @@ def process_repo(repo: str, token: str, search_limit: Optional[int], results_lim
     if ref is None:
         ref = miner.get_default_branch()
     
+    # Initialize cache manager if caching is enabled
+    cache_manager = None
+    if use_cache:
+        from .cache import CacheManager
+        cache_manager = CacheManager(owner, name, "commits")
+        print(f"Cache contains {cache_manager.size()} commits for {owner}/{name}")
+    
     limit_desc = []
     if search_limit:
         limit_desc.append(f"search limit: {search_limit} commits")
@@ -567,7 +677,7 @@ def process_repo(repo: str, token: str, search_limit: Optional[int], results_lim
         limit_desc.append(f"results limit: {results_limit} updates")
     print(f"Mining {repo} ({', '.join(limit_desc) if limit_desc else 'no limits'})...")
     
-    miner.mine(search_limit, results_limit, output_file, state_file, ref)
+    miner.mine(search_limit, results_limit, output_file, state_file, ref, cache_manager)
     print(f"Mining complete for {repo}.")
 
 def main():

@@ -34,6 +34,53 @@ def run_step(command, description):
         print(f"Error during '{description}': {e}")
         sys.exit(1)
 
+def prime_cache_for_repo(repo, mining_type):
+    """
+    Prime the cache for a repository based on mining type.
+    
+    Args:
+        repo: Repository in owner/name format
+        mining_type: Type of mining ('fixes' or 'simple-dep-updates')
+    """
+    if "/" not in repo:
+        print(f"Skipping invalid repo format: {repo}")
+        return
+    
+    owner, name = repo.split("/", 1)
+    token = os.environ.get("GITHUB_TOKEN")
+    
+    if not token:
+        print("Error: GITHUB_TOKEN not found")
+        return
+    
+    print(f"\n{'='*60}")
+    print(f"CACHE PRIMING: {repo}")
+    print(f"{'='*60}\n")
+    
+    if mining_type == "fixes":
+        from mining.mine_fixes import GitHubMiner
+        from mining.cache import CacheManager, prime_pr_cache
+        
+        miner = GitHubMiner(token, owner, name)
+        cache_manager = CacheManager(owner, name, "prs")
+        
+        prime_pr_cache(miner, cache_manager, max_items=100)
+        
+    elif mining_type == "simple-dep-updates":
+        from mining.mine_simple_dependency_updates import SimpleDependencyMiner
+        from mining.cache import CacheManager, prime_commit_cache
+        
+        miner = SimpleDependencyMiner(token, owner, name)
+        cache_manager = CacheManager(owner, name, "commits")
+        
+        # Detect default branch
+        ref = miner.get_default_branch()
+        
+        prime_commit_cache(miner, cache_manager, ref, max_items=100)
+    
+    print(f"Cache priming complete for {repo}\n")
+
+
 def run_mining(repo, search_limit, results_limit, mining_type, output_dir, state_dir):
     """
     Run Step 1: Mining based on the specified type.
@@ -169,6 +216,7 @@ def main():
     parser.add_argument("--results-limit", type=int, help="Maximum number of valid results to find (stops after finding this many valid pairs)")
     parser.add_argument("--timeout", type=int, default=120, help="Timeout in seconds for processing each repository (default: 120)")
     parser.add_argument("--clean", action="store_true", help="Clean previous results/state before running (deletes entire results/ and .state/ directories)")
+    parser.add_argument("--clean-cache", action="store_true", help="Clean cache before running (deletes entire .cache/ directory)")
     parser.add_argument("--type", default="fixes", choices=["fixes", "simple-dep-updates"],
                        help="Type of mining to run (Step 1): 'fixes' (PR-based bad->good) or 'simple-dep-updates' (single-line dependency updates). Default: fixes")
     parser.add_argument("--classifier", default="simple", choices=["simple", "ai"],
@@ -183,6 +231,11 @@ def main():
     # Step 0: Load environment variables and validate tokens
     load_env()
     validate_tokens(args.classifier)
+    
+    # Clean cache if requested (done first, before anything else)
+    if args.clean_cache:
+        from mining.cache import CacheManager
+        CacheManager.clear_all_caches()
     
     # Clean entire results and state directories if requested (done first, before processing any repos)
     if args.clean:
@@ -211,6 +264,14 @@ def main():
         repos = [args.repo_or_file]
     
     print(f"Processing {len(repos)} repository/repositories with {args.timeout} second timeout per repo\n")
+    
+    # Prime cache for all repos first
+    for repo in repos:
+        try:
+            prime_cache_for_repo(repo, args.type)
+        except Exception as e:
+            print(f"Failed to prime cache for {repo}: {e}")
+            # Continue to next repo
         
     for repo in repos:
         try:

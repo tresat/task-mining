@@ -196,15 +196,16 @@ class GitHubMiner:
         with open(state_file, 'w') as f:
             json.dump({"cursor": cursor}, f)
 
-    def mine(self, search_limit: Optional[int], results_limit: Optional[int], output_file: str, state_file: str) -> List[Dict[str, Any]]:
+    def mine(self, search_limit: Optional[int], results_limit: Optional[int], output_file: str, state_file: str, cache_manager=None) -> List[Dict[str, Any]]:
         """
-        Mines the repository for Bad -> Good commit pairs with resumability.
+        Mines the repository for Bad -> Good commit pairs with resumability and caching.
         
         Args:
             search_limit: Maximum number of PRs to search through (None for unlimited)
             results_limit: Maximum number of valid pairs to find (None for unlimited)
             output_file: Path to output JSON file
             state_file: Path to state file for resumability
+            cache_manager: Optional CacheManager instance for PR caching
         """
         results = []
         
@@ -223,7 +224,73 @@ class GitHubMiner:
             
         processed_count = 0
         
-        # Continue until we hit either limit (if specified)
+        # If using cache, try to mine from cache first
+        if cache_manager:
+            print(f"\nMining from cache ({cache_manager.size()} PRs available)...")
+            cached_prs = cache_manager.get_all()
+            
+            # Sort PR numbers to process in order
+            pr_numbers = sorted([int(k) for k in cached_prs.keys()], reverse=True)
+            
+            for pr_number in pr_numbers:
+                # Check results limit
+                if results_limit and len(results) >= results_limit:
+                    print(f"Reached results limit of {results_limit} pairs.")
+                    return results
+                
+                # Check search limit
+                if search_limit and processed_count >= search_limit:
+                    print(f"Reached search limit of {search_limit} PRs.")
+                    return results
+                
+                pr_data = cached_prs[str(pr_number)]
+                commits = pr_data["commits"]["nodes"]
+                
+                last_bad_commit = None
+                
+                for commit_node in commits:
+                    commit = commit_node["commit"]
+                    oid = commit["oid"]
+                    msg = commit["message"].split('\n')[0]
+                    
+                    if self.is_build_failed(commit_node):
+                        last_bad_commit = commit_node
+                    elif self.is_build_successful(commit_node):
+                        if last_bad_commit:
+                            bad_commit = last_bad_commit["commit"]
+                            pair = {
+                                "pr_id": pr_number,
+                                "pr_url": pr_data["url"],
+                                "repo_url": f"https://github.com/{self.owner}/{self.name}",
+                                "from_commit": bad_commit["oid"],
+                                "from_msg": bad_commit["message"].split('\n')[0],
+                                "to_commit": oid,
+                                "to_msg": msg,
+                                "files_changed": []
+                            }
+                            # Check for duplicates before adding
+                            if not any(r['to_commit'] == oid for r in results):
+                                results.append(pair)
+                                print(f"Found pair in PR #{pr_number}: {bad_commit['oid'][:7]} -> {oid[:7]}")
+                            
+                            last_bad_commit = None
+                
+                processed_count += 1
+            
+            # Save results after cache mining
+            with open(output_file, "w") as f:
+                json.dump(results, f, indent=2)
+            print(f"\nCache exhausted. Saved {len(results)} pairs from cache.")
+            
+            # If we've hit limits, return
+            if results_limit and len(results) >= results_limit:
+                return results
+            if search_limit and processed_count >= search_limit:
+                return results
+            
+            print(f"Fetching more PRs from GitHub...\n")
+        
+        # Continue with GitHub API queries
         while True:
             # Check results limit
             if results_limit and len(results) >= results_limit:
@@ -248,7 +315,7 @@ class GitHubMiner:
                 "limit": batch_size
             }
             
-            print(f"Fetching PRs (cursor={cursor})...")
+            print(f"Fetching PRs from GitHub (cursor={cursor})...")
             data = self._query(PR_QUERY, variables)
             
             if not data.get("data") or not data["data"].get("repository"):
@@ -266,6 +333,12 @@ class GitHubMiner:
             for pr in nodes:
                 pr_number = pr["number"]
                 commits = self.get_all_commits_for_pr(pr)
+                
+                # Cache the PR data if cache manager is available
+                if cache_manager and cache_manager.size() < 100:
+                    pr_data = pr.copy()
+                    pr_data["commits"]["nodes"] = commits
+                    cache_manager.set(str(pr_number), pr_data)
                 
                 last_bad_commit = None
                 
@@ -287,7 +360,7 @@ class GitHubMiner:
                                 "from_msg": bad_commit["message"].split('\n')[0],
                                 "to_commit": oid,
                                 "to_msg": msg,
-                                "files_changed": []  # Not available for PR-based mining; can be populated by classification
+                                "files_changed": []
                             }
                             # Check for duplicates before adding
                             if not any(r['to_commit'] == oid for r in results) and not any(r['to_commit'] == oid for r in batch_results):
@@ -313,8 +386,8 @@ class GitHubMiner:
                 
         return results
 
-def process_repo(repo: str, token: str, search_limit: Optional[int], results_limit: Optional[int], output_dir: str, state_dir: str):
-    """Process a single repository."""
+def process_repo(repo: str, token: str, search_limit: Optional[int], results_limit: Optional[int], output_dir: str, state_dir: str, use_cache: bool = True):
+    """Process a single repository with optional caching."""
     print(f"\n{'#'*60}")
     print(f"PROCESSING REPO: {repo}")
     print(f"{'#'*60}\n")
@@ -337,6 +410,13 @@ def process_repo(repo: str, token: str, search_limit: Optional[int], results_lim
     
     miner = GitHubMiner(token, owner, name)
     
+    # Initialize cache manager if caching is enabled
+    cache_manager = None
+    if use_cache:
+        from .cache import CacheManager
+        cache_manager = CacheManager(owner, name, "prs")
+        print(f"Cache contains {cache_manager.size()} PRs for {owner}/{name}")
+    
     limit_desc = []
     if search_limit:
         limit_desc.append(f"search limit: {search_limit} PRs")
@@ -344,7 +424,7 @@ def process_repo(repo: str, token: str, search_limit: Optional[int], results_lim
         limit_desc.append(f"results limit: {results_limit} pairs")
     print(f"Mining {repo} ({', '.join(limit_desc) if limit_desc else 'no limits'})...")
     
-    miner.mine(search_limit, results_limit, output_file, state_file)
+    miner.mine(search_limit, results_limit, output_file, state_file, cache_manager)
     print(f"Mining complete for {repo}.")
 
 def main():

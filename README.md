@@ -7,14 +7,52 @@ This project mines GitHub repositories for "Self-Correction" pairs (Bad Commit -
 - `/mining` - Mining scripts for extracting data from repositories
   - `mine_fixes.py` - Mines PR-based bad->good commit pairs
   - `mine_simple_dependency_updates.py` - Mines single-line dependency updates
+  - `cache.py` - GitHub API caching system
   - `common.py` - Shared utilities for mining scripts
 - `/classification` - Classification and analysis scripts
   - `analyze_pairs.py` - Heuristic classification of mining results
   - `gemini_classifier.py` - AI-powered classification using Gemini
 - `/test` - Unit tests for mining and classification scripts
 - `/.state` - State files for resumable mining (gitignored)
+- `/.cache` - GitHub API response cache (gitignored)
 - `/results` - Mining results (gitignored)
 - `/samples` - Sample output files for reference
+
+## GitHub API Caching
+
+The mining scripts use a comprehensive caching system to improve performance and reduce API calls:
+
+### How It Works
+1. **Cache Location**: `.cache/{owner}_{name}/` directory (hidden, gitignored)
+2. **Cache Structure**: 
+   - PRs: `prs_cache.json` (for `mine_fixes.py`)
+   - Commits: `commits_cache.json` (for `mine_simple_dependency_updates.py`)
+3. **Cache Priming** (automatic first step):
+   - Fetches list of recent PR/commit IDs from GitHub
+   - For each ID (most to least recent): checks if full details are in cache
+   - If not cached: fetches full details and adds to cache
+   - Stops when: (a) finding an ID already in cache, OR (b) reaching 100 items in cache
+4. **Mining with Cache**:
+   - First reads data from cache (fast, no API calls)
+   - When cache is exhausted: fetches next batch from GitHub and caches it
+   - Automatically displays cache stats when starting
+
+### Cache Management
+- **Always Enabled**: Caching is automatic and always active
+- **Cache Stats**: Shown when mining starts (e.g., "Cache contains 150 PRs for owner/repo")
+- **Logging**: Clear indication when querying GitHub vs. reading from cache
+- **Clean Options**:
+  - `--clean` clears results/ and .state/ but NOT .cache/
+  - `--clean-cache` clears the entire .cache/ directory
+  
+Example:
+```bash
+# Clean cache before running
+python3 run_pipeline.py owner/repo --search-limit 100 --clean-cache
+
+# Normal run uses existing cache
+python3 run_pipeline.py owner/repo --search-limit 100
+```
 
 ## Output Format
 
@@ -53,8 +91,9 @@ All mining scripts now use a **unified JSON format** to ensure consistency:
 **Function**: Runs the entire pipeline: Token Validation -> Mining -> Classification.
 
 **Pipeline Steps:**
-- **Step 0**: Token Validation - Validates that required environment tokens (GITHUB_TOKEN, GEMINI_API_KEY) are set
-- **Step 1**: Mining - Extracts data based on `--type` parameter
+- **Step 0a**: Cache Priming - Automatically primes cache with recent PRs/commits (always enabled)
+- **Step 0b**: Token Validation - Validates that required environment tokens (GITHUB_TOKEN, GEMINI_API_KEY) are set
+- **Step 1**: Mining - Extracts data based on `--type` parameter (uses cache when available)
 - **Step 2**: Simple/Heuristic Classification - Analyzes mining results
 - **Step 2b**: AI Classification - Deepens analysis using Gemini (requires GEMINI_API_KEY)
 
@@ -75,8 +114,10 @@ All mining scripts now use a **unified JSON format** to ensure consistency:
   - If a repository exceeds the timeout, it is skipped and processing continues with the next repository
   - Prevents individual repositories from hanging indefinitely
   - Example: `--timeout 300` for 5-minute timeout
-- **Clean Option** (`--clean`):
-  - Deletes entire `results/` and `.state/` directories before running
+- **Clean Options**:
+  - `--clean`: Deletes entire `results/` and `.state/` directories before running (does NOT clear cache)
+  - `--clean-cache`: Deletes entire `.cache/` directory before running
+  - Both can be used together for a complete clean
   - Useful for starting fresh or after changing mining parameters
   - Executes before any mining or classification begins
 - **Usage (Single Repo)**:
@@ -93,8 +134,14 @@ All mining scripts now use a **unified JSON format** to ensure consistency:
   # Run with custom timeout (5 minutes)
   python3 run_pipeline.py android/nowinandroid --search-limit 100 --type fixes --timeout 300
   
-  # Run with clean (deletes all previous results first)
+  # Run with clean (deletes all previous results first, but keeps cache)
   python3 run_pipeline.py android/nowinandroid --search-limit 100 --type fixes --clean
+  
+  # Run with cache clean (clears cache before running)
+  python3 run_pipeline.py android/nowinandroid --search-limit 100 --type fixes --clean-cache
+  
+  # Complete clean (results, state, and cache)
+  python3 run_pipeline.py android/nowinandroid --search-limit 100 --type fixes --clean --clean-cache
   
   # Run only simple classification (default)
   python3 run_pipeline.py android/nowinandroid --search-limit 100 --type fixes
@@ -116,6 +163,9 @@ All mining scripts now use a **unified JSON format** to ensure consistency:
   
   # Process simple-dep-updates with longer timeout for slow repos
   python3 run_pipeline.py repos.txt --search-limit 100 --type simple-dep-updates --timeout 600
+  
+  # Clean cache before processing multiple repos
+  python3 run_pipeline.py repos.txt --search-limit 100 --type fixes --clean-cache
   ```
   Results will be saved in `results/{owner}_{name}/`, state files in `.state/`.
 
