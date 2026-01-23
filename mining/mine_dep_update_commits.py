@@ -524,7 +524,7 @@ class SimpleDependencyMiner:
         
         # Continue with GitHub API queries
         while True:
-            # Check results limit
+            # Check results limit BEFORE fetching
             if results_limit and len(results) >= results_limit:
                 print(f"Reached results limit of {results_limit} updates.")
                 break
@@ -568,16 +568,24 @@ class SimpleDependencyMiner:
                 print("No more commits found.")
                 break
             
-            batch_results = []
+            # ALWAYS add fetched commits to cache FIRST
+            if cache_manager:
+                for commit in nodes:
+                    oid = commit["oid"]
+                    cache_manager.set(oid, commit)
+                print(f"Added {len(nodes)} commits to cache")
+            
+            # Now process commits FROM CACHE
             for commit in nodes:
+                # Check results limit immediately
+                if results_limit and len(results) >= results_limit:
+                    print(f"Reached results limit of {results_limit} updates.")
+                    with open(output_file, "w") as f:
+                        json.dump(results, f, indent=2)
+                    return results
+                
                 oid = commit["oid"]
                 msg = commit["message"].split('\n')[0]
-                
-                # Cache the commit if cache manager is available
-                if cache_manager:
-                    from .cache import MAX_CACHE_ITEMS
-                    if cache_manager.size() < MAX_CACHE_ITEMS:
-                        cache_manager.set(oid, commit)
                 
                 # Check if current commit has successful build
                 if not self.is_build_successful(commit):
@@ -612,6 +620,7 @@ class SimpleDependencyMiner:
                 
                 # Create result entry
                 result = {
+                    "pr_id": None,  # Not available for commit-based mining
                     "repo_url": f"https://github.com/{self.owner}/{self.name}",
                     "from_commit": parent_oid,
                     "from_msg": "",  # Parent message not available without additional API call
@@ -631,11 +640,9 @@ class SimpleDependencyMiner:
                 }
                 
                 # Check for duplicates before adding
-                if not any(r['to_commit'] == oid for r in results) and not any(r['to_commit'] == oid for r in batch_results):
-                    batch_results.append(result)
+                if not any(r['to_commit'] == oid for r in results):
+                    results.append(result)
                     print(f"Found update: {parent_oid[:7]} -> {oid[:7]} in {file_info.get('filename')}")
-            
-            results.extend(batch_results)
             
             # Save progress after each batch
             processed_count += len(nodes)
@@ -654,7 +661,7 @@ class SimpleDependencyMiner:
 
 def process_repo(repo: str, token: str, search_limit: Optional[int], results_limit: Optional[int], output_dir: str, state_dir: str, ref: Optional[str] = None, use_cache: bool = True):
     """Process a single repository with optional caching."""
-    print(f"\n*** PROCESSING REPO: {repo} ***")
+    # Note: PROCESSING REPO message is printed by run_pipeline.py, not here
     
     if "/" not in repo:
         print(f"Skipping invalid repo format: {repo}")

@@ -298,7 +298,7 @@ class GitHubMiner:
         
         # Continue with GitHub API queries
         while True:
-            # Check results limit
+            # Check results limit BEFORE fetching
             if results_limit and len(results) >= results_limit:
                 print(f"Reached results limit of {results_limit} pairs.")
                 break
@@ -336,18 +336,27 @@ class GitHubMiner:
                 print("No more PRs found.")
                 break
             
-            batch_results = []
+            # ALWAYS add fetched PRs to cache FIRST
+            if cache_manager:
+                for pr in nodes:
+                    pr_number = pr["number"]
+                    commits = self.get_all_commits_for_pr(pr)
+                    pr_data = pr.copy()
+                    pr_data["commits"]["nodes"] = commits
+                    cache_manager.set(str(pr_number), pr_data)
+                print(f"Added {len(nodes)} PRs to cache")
+            
+            # Now process PRs FROM CACHE
             for pr in nodes:
+                # Check results limit immediately
+                if results_limit and len(results) >= results_limit:
+                    print(f"Reached results limit of {results_limit} pairs.")
+                    with open(output_file, "w") as f:
+                        json.dump(results, f, indent=2)
+                    return results
+                
                 pr_number = pr["number"]
                 commits = self.get_all_commits_for_pr(pr)
-                
-                # Cache the PR data if cache manager is available
-                if cache_manager:
-                    from .cache import MAX_CACHE_ITEMS
-                    if cache_manager.size() < MAX_CACHE_ITEMS:
-                        pr_data = pr.copy()
-                        pr_data["commits"]["nodes"] = commits
-                        cache_manager.set(str(pr_number), pr_data)
                 
                 last_bad_commit = None
                 
@@ -376,13 +385,18 @@ class GitHubMiner:
                                 "error": None
                             }
                             # Check for duplicates before adding
-                            if not any(r['to_commit'] == oid for r in results) and not any(r['to_commit'] == oid for r in batch_results):
-                                batch_results.append(pair)
+                            if not any(r['to_commit'] == oid for r in results):
+                                results.append(pair)
                                 print(f"Found pair in PR #{pr_number}: {bad_commit['oid'][:7]} -> {oid[:7]}")
+                                
+                                # Check limit immediately after adding
+                                if results_limit and len(results) >= results_limit:
+                                    print(f"Reached results limit of {results_limit} pairs.")
+                                    with open(output_file, "w") as f:
+                                        json.dump(results, f, indent=2)
+                                    return results
                             
                             last_bad_commit = None
-            
-            results.extend(batch_results)
             
             # Save progress after each batch
             processed_count += len(nodes)
@@ -401,7 +415,7 @@ class GitHubMiner:
 
 def process_repo(repo: str, token: str, search_limit: Optional[int], results_limit: Optional[int], output_dir: str, state_dir: str, use_cache: bool = True):
     """Process a single repository with optional caching."""
-    print(f"\n*** PROCESSING REPO: {repo} ***")
+    # Note: PROCESSING REPO message is printed by run_pipeline.py, not here
     
     if "/" not in repo:
         print(f"Skipping invalid repo format: {repo}")
