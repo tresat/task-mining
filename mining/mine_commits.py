@@ -384,11 +384,11 @@ class CommitMiner:
 
     def mine(self, search_limit: Optional[int], results_limit: Optional[int], output_file: str, state_file: str, ref: str = "refs/heads/main", cache_manager=None) -> List[Dict[str, Any]]:
         """
-        Mines the repository for simple dependency update commits with resumability and caching.
+        Mines the repository for commit pairs with successful builds.
         
         Args:
             search_limit: Maximum number of commits to search through (None for unlimited)
-            results_limit: Maximum number of valid updates to find (None for unlimited)
+            results_limit: Maximum number of valid pairs to find (None for unlimited)
             output_file: Path to output JSON file
             state_file: Path to state file for resumability
             ref: Git ref to scan
@@ -406,7 +406,7 @@ class CommitMiner:
             try:
                 with open(output_file, 'r') as f:
                     results = json.load(f)
-                    print(f"Loaded {len(results)} existing updates from {output_file}")
+                    print(f"Loaded {len(results)} existing pairs from {output_file}")
             except Exception:
                 print("Warning: Could not load existing results, starting fresh list.")
         
@@ -428,7 +428,7 @@ class CommitMiner:
             for oid in commit_oids:
                 # Check results limit
                 if results_limit and len(results) >= results_limit:
-                    print(f"Reached results limit of {results_limit} updates.")
+                    print(f"Reached results limit of {results_limit} pairs.")
                     with open(output_file, "w") as f:
                         json.dump(results, f, indent=2)
                     return results
@@ -461,26 +461,7 @@ class CommitMiner:
                 
                 parent_oid = parent["oid"]
                 
-                # Fetch the diff for this commit
-                commit_diff = self.get_commit_diff(oid)
-                if not commit_diff:
-                    processed_count += 1
-                    continue
-                
-                # Check if it's a single line change in a dependency file
-                file_info = self.is_single_line_change(commit_diff)
-                if not file_info:
-                    processed_count += 1
-                    continue
-                
-                # Extract version change
-                patch = file_info.get("patch", "")
-                version_change = self.extract_version_change(patch)
-                if not version_change:
-                    processed_count += 1
-                    continue
-                
-                # Create result entry
+                # Create result entry - CommitMiner only checks for successful builds
                 result = {
                     "pr_id": None,  # Not available for commit-based mining
                     "repo_url": f"https://github.com/{self.owner}/{self.name}",
@@ -490,12 +471,7 @@ class CommitMiner:
                     "to_commit": oid,
                     "to_msg": msg,
                     "to_date": commit["committedDate"],
-                    "files_changed": [{
-                        "filename": file_info.get("filename"),
-                        "line_number": version_change["line_number"],
-                        "from_line_contents": version_change["from_line"],
-                        "to_line_contents": version_change["to_line"]
-                    }],
+                    "files_changed": [],  # Will be populated by classifier
                     "category": None,
                     "tags": [],
                     "error": None
@@ -504,7 +480,7 @@ class CommitMiner:
                 # Check for duplicates before adding
                 if not any(r['to_commit'] == oid for r in results):
                     results.append(result)
-                    print(f"Found update: {parent_oid[:7]} -> {oid[:7]} in {file_info.get('filename')}")
+                    print(f"Found pair: {parent_oid[:7]} -> {oid[:7]}")
                 
                 processed_count += 1
             
@@ -512,7 +488,7 @@ class CommitMiner:
             with open(output_file, "w") as f:
                 json.dump(results, f, indent=2)
             new_from_cache = len(results) - initial_results_count
-            print(f"\nCache exhausted. Found {new_from_cache} new updates from cache.")
+            print(f"\nCache exhausted. Found {new_from_cache} new pairs from cache.")
             
             # If we've hit limits, return
             if results_limit and len(results) >= results_limit:
@@ -526,7 +502,7 @@ class CommitMiner:
         while True:
             # Check results limit BEFORE fetching
             if results_limit and len(results) >= results_limit:
-                print(f"Reached results limit of {results_limit} updates.")
+                print(f"Reached results limit of {results_limit} pairs.")
                 break
             
             # Check search limit
@@ -580,7 +556,7 @@ class CommitMiner:
             for commit in nodes:
                 # Check results limit immediately
                 if results_limit and len(results) >= results_limit:
-                    print(f"Reached results limit of {results_limit} updates.")
+                    print(f"Reached results limit of {results_limit} pairs.")
                     with open(output_file, "w") as f:
                         json.dump(results, f, indent=2)
                     return results
@@ -603,23 +579,7 @@ class CommitMiner:
                 
                 parent_oid = parent["oid"]
                 
-                # Fetch the diff for this commit
-                commit_diff = self.get_commit_diff(oid)
-                if not commit_diff:
-                    continue
-                
-                # Check if it's a single line change in a dependency file
-                file_info = self.is_single_line_change(commit_diff)
-                if not file_info:
-                    continue
-                
-                # Extract version change
-                patch = file_info.get("patch", "")
-                version_change = self.extract_version_change(patch)
-                if not version_change:
-                    continue
-                
-                # Create result entry
+                # Create result entry - CommitMiner only checks for successful builds
                 result = {
                     "pr_id": None,  # Not available for commit-based mining
                     "repo_url": f"https://github.com/{self.owner}/{self.name}",
@@ -629,12 +589,7 @@ class CommitMiner:
                     "to_commit": oid,
                     "to_msg": msg,
                     "to_date": commit["committedDate"],
-                    "files_changed": [{
-                        "filename": file_info.get("filename"),
-                        "line_number": version_change["line_number"],
-                        "from_line_contents": version_change["from_line"],
-                        "to_line_contents": version_change["to_line"]
-                    }],
+                    "files_changed": [],  # Will be populated by classifier
                     "category": None,
                     "tags": [],
                     "error": None
@@ -643,7 +598,7 @@ class CommitMiner:
                 # Check for duplicates before adding
                 if not any(r['to_commit'] == oid for r in results):
                     results.append(result)
-                    print(f"Found update: {parent_oid[:7]} -> {oid[:7]} in {file_info.get('filename')}")
+                    print(f"Found pair: {parent_oid[:7]} -> {oid[:7]}")
             
             # Save progress after each batch
             processed_count += len(nodes)
@@ -652,7 +607,7 @@ class CommitMiner:
             
             with open(output_file, "w") as f:
                 json.dump(results, f, indent=2)
-            print(f"Saved {len(results)} updates (total) to {output_file}")
+            print(f"Saved {len(results)} pairs (total) to {output_file}")
             
             if not history["pageInfo"]["hasNextPage"]:
                 print("Reached end of commits.")
@@ -678,7 +633,7 @@ def process_repo(repo: str, token: str, search_limit: Optional[int], results_lim
     ensure_directory(state_dir)
     
     output_file = os.path.join(per_repo_dir, f"{owner}_{name}.json")
-    state_file = os.path.join(state_dir, f"{owner}_{name}_simple_dependency_state.json")
+    state_file = os.path.join(state_dir, f"{owner}_{name}_commit_pairs_state.json")
     
     miner = CommitMiner(token, owner, name)
     
@@ -697,7 +652,7 @@ def process_repo(repo: str, token: str, search_limit: Optional[int], results_lim
     if search_limit:
         limit_desc.append(f"search limit: {search_limit} commits")
     if results_limit:
-        limit_desc.append(f"results limit: {results_limit} updates")
+        limit_desc.append(f"results limit: {results_limit} pairs")
     print(f"Mining {repo} ({', '.join(limit_desc) if limit_desc else 'no limits'})...")
     
     miner.mine(search_limit, results_limit, output_file, state_file, ref, cache_manager)
@@ -706,11 +661,11 @@ def process_repo(repo: str, token: str, search_limit: Optional[int], results_lim
 def main():
     load_env()
     
-    parser = argparse.ArgumentParser(description="Mine Simple Dependency Updates from GitHub")
+    parser = argparse.ArgumentParser(description="Mine Commit Pairs with Successful Builds from GitHub")
     parser.add_argument("repo_or_file", help="GitHub repository in 'owner/name' format OR path to a text file with a list of repos")
     parser.add_argument("--token", help="GitHub PAT (optional if GITHUB_TOKEN env var is set)")
     parser.add_argument("--search-limit", type=int, help="Maximum number of commits to search through")
-    parser.add_argument("--results-limit", type=int, help="Maximum number of valid updates to find")
+    parser.add_argument("--results-limit", type=int, help="Maximum number of valid pairs to find")
     parser.add_argument("--output", default="results", help="Output directory for results")
     parser.add_argument("--state", default=".state", help="Directory for state files (default: .state)")
     parser.add_argument("--ref", default=None, help="Git ref to scan (e.g., refs/heads/main). If not specified, auto-detects main or master")
