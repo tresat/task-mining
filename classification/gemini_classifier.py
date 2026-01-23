@@ -105,7 +105,7 @@ class GeminiClassifier:
             try:
                 with open(output_file, 'r') as f:
                     existing_results = json.load(f)
-                    processed_commits = {r["good_commit"] for r in existing_results}
+                    processed_commits = {r.get("to_commit") or r.get("good_commit") for r in existing_results}
                     print(f"Loaded {len(existing_results)} existing classifications.")
             except Exception:
                 print("Warning: Could not load existing results, starting fresh.")
@@ -116,16 +116,16 @@ class GeminiClassifier:
         new_count = 0
         
         for i, pair in enumerate(pairs):
-            good_commit = pair["good_commit"]
+            to_commit = pair.get("to_commit") or pair.get("good_commit")  # Support both formats
             
-            if good_commit in processed_commits:
-                print(f"[{i+1}/{len(pairs)}] Skipping {good_commit[:7]} (Already processed)")
+            if to_commit in processed_commits:
+                print(f"[{i+1}/{len(pairs)}] Skipping {to_commit[:7]} (Already processed)")
                 continue
                 
-            msg = pair["good_msg"]
+            msg = pair.get("to_msg") or pair.get("good_msg")  # Support both formats
             
-            print(f"[{i+1}/{len(pairs)}] Fetching diff for {good_commit[:7]}...")
-            diff = self.get_commit_diff(good_commit)
+            print(f"[{i+1}/{len(pairs)}] Fetching diff for {to_commit[:7]}...")
+            diff = self.get_commit_diff(to_commit)
             
             print(f"  Asking Gemini...")
             ai_verdict = self.classify_with_gemini(msg, diff)
@@ -133,7 +133,7 @@ class GeminiClassifier:
             
             pair["ai_is_dependency_update"] = ai_verdict
             results.append(pair)
-            processed_commits.add(good_commit)
+            processed_commits.add(to_commit)
             new_count += 1
             
             # Save incrementally every 5 items

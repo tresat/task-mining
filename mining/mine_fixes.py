@@ -258,13 +258,17 @@ class GitHubMiner:
                             pair = {
                                 "pr_id": pr_number,
                                 "pr_url": pr["url"],
-                                "bad_commit": bad_commit["oid"],
-                                "bad_msg": bad_commit["message"].split('\n')[0],
-                                "good_commit": oid,
-                                "good_msg": msg
+                                "from_commit": bad_commit["oid"],
+                                "from_msg": bad_commit["message"].split('\n')[0],
+                                "to_commit": oid,
+                                "to_msg": msg,
+                                "changed_file": "",  # Not available for PR-based mining
+                                "changed_line_number": None,  # Not available for PR-based mining
+                                "from_line_contents": "",  # Not available for PR-based mining
+                                "to_line_contents": ""  # Not available for PR-based mining
                             }
                             # Check for duplicates before adding
-                            if not any(r['good_commit'] == oid for r in results) and not any(r['good_commit'] == oid for r in batch_results):
+                            if not any(r['to_commit'] == oid for r in results) and not any(r['to_commit'] == oid for r in batch_results):
                                 batch_results.append(pair)
                                 print(f"Found pair in PR #{pr_number}: {bad_commit['oid'][:7]} -> {oid[:7]}")
                             

@@ -55,16 +55,16 @@ def process_repo(repo, limit, clean, mining_type):
         
         # Step 2: Heuristic Analysis
         run_step(
-            ["python3", "analyze_pairs.py", repo, "--input", mining_output, "--output", analyzed_output],
+            ["python3", "-m", "classification.analyze_pairs", repo, "--input", mining_output, "--output", analyzed_output],
             f"Running Heuristic Analysis for {repo}"
         )
         
         # Step 3: AI Classification
         run_step(
-            ["python3", "gemini_classifier.py", repo, "--input", analyzed_output, "--output", ai_output],
+            ["python3", "-m", "classification.gemini_classifier", repo, "--input", analyzed_output, "--output", ai_output],
             f"Running AI Classification (Gemini) for {repo}"
         )
-    elif mining_type == "simple":
+    elif mining_type == "simple-dep-updates":
         run_step(
             ["python3", "-m", "mining.mine_simple_dependency_updates", repo, "--limit", str(limit), "--output", "results", "--state", state_dir],
             f"Mining Simple Dependency Updates for {repo}"
@@ -82,11 +82,11 @@ def process_repo(repo, limit, clean, mining_type):
         
         # Run analysis on fixes mining results
         run_step(
-            ["python3", "analyze_pairs.py", repo, "--input", mining_output, "--output", analyzed_output],
+            ["python3", "-m", "classification.analyze_pairs", repo, "--input", mining_output, "--output", analyzed_output],
             f"Running Heuristic Analysis for {repo}"
         )
         run_step(
-            ["python3", "gemini_classifier.py", repo, "--input", analyzed_output, "--output", ai_output],
+            ["python3", "-m", "classification.gemini_classifier", repo, "--input", analyzed_output, "--output", ai_output],
             f"Running AI Classification (Gemini) for {repo}"
         )
 
@@ -95,8 +95,8 @@ def main():
     parser.add_argument("repo_or_file", help="GitHub repository (owner/name) OR path to a text file with a list of repos")
     parser.add_argument("--limit", type=int, default=100, help="Limit for mining PRs per repo")
     parser.add_argument("--clean", action="store_true", help="Clean previous results/state before running")
-    parser.add_argument("--type", default="fixes", choices=["fixes", "simple", "both"],
-                       help="Type of mining to run: 'fixes' (PR-based bad->good), 'simple' (single-line dependency updates), or 'both' (default: fixes)")
+    parser.add_argument("--type", default="fixes", choices=["fixes", "simple-dep-updates", "both"],
+                       help="Type of mining to run: 'fixes' (PR-based bad->good), 'simple-dep-updates' (single-line dependency updates), or 'both' (default: fixes)")
     
     args = parser.parse_args()
     

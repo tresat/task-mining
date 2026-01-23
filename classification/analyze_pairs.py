@@ -46,8 +46,8 @@ class PairAnalyzer:
 
     def classify_pair(self, pair: Dict[str, Any]) -> Dict[str, Any]:
         """Classifies a pair based on changed files."""
-        good_commit = pair["good_commit"]
-        files = self.get_changed_files(good_commit)
+        to_commit = pair.get("to_commit") or pair.get("good_commit")  # Support both formats for backward compatibility
+        files = self.get_changed_files(to_commit)
         
         is_dependency_update = False
         for f in files:
@@ -73,7 +73,8 @@ class PairAnalyzer:
                 try:
                     result = future.result()
                     analyzed_pairs.append(result)
-                    print(f"Analyzed {result['good_commit'][:7]} -> {result['category']}")
+                    to_commit = result.get('to_commit') or result.get('good_commit')
+                    print(f"Analyzed {to_commit[:7]} -> {result['category']}")
                 except Exception as e:
                     print(f"Analysis failed for a pair: {e}")
                     

@@ -8,10 +8,34 @@ This project mines GitHub repositories for "Self-Correction" pairs (Bad Commit -
   - `mine_fixes.py` - Mines PR-based bad->good commit pairs
   - `mine_simple_dependency_updates.py` - Mines single-line dependency updates
   - `common.py` - Shared utilities for mining scripts
-- `/test` - Unit tests for mining scripts
+- `/classification` - Classification and analysis scripts
+  - `analyze_pairs.py` - Heuristic classification of mining results
+  - `gemini_classifier.py` - AI-powered classification using Gemini
+- `/test` - Unit tests for mining and classification scripts
 - `/state` - State files for resumable mining (gitignored)
 - `/results` - Mining results (gitignored)
 - `/samples` - Sample output files for reference
+
+## Output Format
+
+All mining scripts now use a **unified JSON format** to ensure consistency:
+
+```json
+{
+  "pr_id": 123,
+  "pr_url": "https://github.com/owner/repo/pull/123",
+  "from_commit": "abc123",
+  "from_msg": "Initial implementation",
+  "to_commit": "def456",
+  "to_msg": "Fix build issue",
+  "changed_file": "build.gradle",
+  "changed_line_number": 42,
+  "from_line_contents": "version = \"1.0.0\"",
+  "to_line_contents": "version = \"1.1.0\""
+}
+```
+
+Fields not applicable to a specific mining type (e.g., `pr_id` for commit-based mining) are left empty.
 
 ## Scripts
 
@@ -19,7 +43,7 @@ This project mines GitHub repositories for "Self-Correction" pairs (Bad Commit -
 **Function**: Runs the entire pipeline (Mining -> Analysis -> AI).
 - **Mining Types**: Supports different mining modes via `--type` parameter:
   - `fixes` (default): PR-based bad->good commit pairs + analysis + AI classification
-  - `simple`: Single-line dependency updates only
+  - `simple-dep-updates`: Single-line dependency updates only
   - `both`: Runs both mining types
 - **Usage (Single Repo)**:
   ```bash
@@ -64,22 +88,19 @@ This project mines GitHub repositories for "Self-Correction" pairs (Bad Commit -
   python3 -m mining.mine_simple_dependency_updates repos.txt --limit 1000
   ```
   Results will be saved in `results/{owner}_{name}/simple_dependency_updates.json`.
-- **Output Format**: Similar to `mining_results.json` but with:
-  - `from_commit` / `to_commit` instead of `bad_commit` / `good_commit`
-  - Additional fields: `changed_file`, `changed_line_number`, `from_line_contents`, `to_line_contents`
 
-### 2. `analyze_pairs.py` (The Heuristic Classifier)
+### 2. `classification/analyze_pairs.py` (The Heuristic Classifier)
 **Function**: Classifies pairs based on changed files (Fast & Cheap).
 - **Logic**: Checks if `build.gradle`, `libs.versions.toml`, or other build files were modified.
 - **Categories**: `Dependency Update` vs `Other`.
-- **Input**: `mining_results.json`
+- **Input**: Mining results in unified format
 - **Output**: `analyzed_results.json`
 - **Usage**:
   ```bash
-  python3 analyze_pairs.py android/nowinandroid
+  python3 -m classification.analyze_pairs android/nowinandroid
   ```
 
-### 3. `gemini_classifier.py` (The AI Classifier)
+### 3. `classification/gemini_classifier.py` (The AI Classifier)
 **Function**: Classifies pairs using an LLM (Gemini) for deeper understanding.
 - **Logic**: Fetches the actual code diff and asks Gemini: "Is this a dependency update?".
 - **Benefit**: Can distinguish between a simple version bump and a logic fix in a build file.
@@ -87,7 +108,7 @@ This project mines GitHub repositories for "Self-Correction" pairs (Bad Commit -
 - **Output**: `ai_classified_results.json`
 - **Usage**:
   ```bash
-  python3 gemini_classifier.py android/nowinandroid
+  python3 -m classification.gemini_classifier android/nowinandroid
   ```
 
 ## Resumability
