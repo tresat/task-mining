@@ -103,10 +103,12 @@ class GeminiClassifier:
             pairs = json.load(f)
             
         # Track which commits have been processed with sub_category
+        # We check for not None and not empty string to handle all edge cases
         processed_commits = set()
         for pair in pairs:
             to_commit = pair.get("to_commit") or pair.get("good_commit")
-            if pair.get("sub_category") is not None:
+            sub_cat = pair.get("sub_category")
+            if sub_cat is not None and sub_cat != "":
                 processed_commits.add(to_commit)
                 
         print(f"Found {len(processed_commits)} already classified pairs.")

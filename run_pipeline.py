@@ -94,8 +94,12 @@ def run_mining(repo, search_limit, results_limit, mining_type, output_dir, state
         return None
     owner, name = repo.split("/", 1)
     
+    # Ensure per_repo directory exists before constructing path
+    per_repo_dir = os.path.join(output_dir, "per_repo")
+    os.makedirs(per_repo_dir, exist_ok=True)
+    
     # New per_repo structure
-    per_repo_output = os.path.join(output_dir, "per_repo", f"{owner}_{name}.json")
+    per_repo_output = os.path.join(per_repo_dir, f"{owner}_{name}.json")
     
     # Build limit arguments
     limit_args = []

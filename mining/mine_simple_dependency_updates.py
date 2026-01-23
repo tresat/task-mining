@@ -32,7 +32,7 @@ query ($owner: String!, $name: String!, $ref: String!, $cursor: String, $limit: 
               parents(first: 1) {
                 nodes {
                   oid
-                  committedDate
+                  committedDate  # Needed for from_date field in output
                   statusCheckRollup {
                     state
                   }
