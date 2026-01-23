@@ -2,6 +2,24 @@ import argparse
 import subprocess
 import sys
 import os
+import signal
+from contextlib import contextmanager
+
+@contextmanager
+def timeout_context(seconds, repo_name):
+    """Context manager for timing out operations."""
+    def timeout_handler(signum, frame):
+        raise TimeoutError(f"Repository {repo_name} processing exceeded {seconds} second timeout")
+    
+    # Set up the timeout
+    old_handler = signal.signal(signal.SIGALRM, timeout_handler)
+    signal.alarm(seconds)
+    try:
+        yield
+    finally:
+        # Restore the old handler and cancel the alarm
+        signal.alarm(0)
+        signal.signal(signal.SIGALRM, old_handler)
 
 def run_step(command, description):
     print(f"\n{'='*60}")
@@ -15,7 +33,7 @@ def run_step(command, description):
         print(f"Error during '{description}': {e}")
         sys.exit(1)
 
-def process_repo(repo, search_limit, results_limit, mining_type, classifier):
+def process_repo(repo, search_limit, results_limit, mining_type, classifier, timeout_seconds):
     print(f"\n{'#'*60}")
     print(f"PROCESSING REPO: {repo}")
     print(f"{'#'*60}\n")
@@ -111,6 +129,7 @@ def main():
     parser.add_argument("repo_or_file", help="GitHub repository (owner/name) OR path to a text file with a list of repos")
     parser.add_argument("--search-limit", type=int, help="Maximum number of PRs/commits to search through (stops after searching this many items)")
     parser.add_argument("--results-limit", type=int, help="Maximum number of valid results to find (stops after finding this many valid pairs)")
+    parser.add_argument("--timeout", type=int, default=120, help="Timeout in seconds for processing each repository (default: 120)")
     parser.add_argument("--clean", action="store_true", help="Clean previous results/state before running (deletes entire results/ and state/ directories)")
     parser.add_argument("--type", default="fixes", choices=["fixes", "simple-dep-updates", "both"],
                        help="Type of mining to run: 'fixes' (PR-based bad->good), 'simple-dep-updates' (single-line dependency updates), or 'both' (default: fixes)")
@@ -148,10 +167,19 @@ def main():
         print(f"Loaded {len(repos)} repositories from {args.repo_or_file}")
     else:
         repos = [args.repo_or_file]
+    
+    print(f"Processing {len(repos)} repository/repositories with {args.timeout} second timeout per repo\n")
         
     for repo in repos:
         try:
-            process_repo(repo, args.search_limit, args.results_limit, args.type, args.classifier)
+            with timeout_context(args.timeout, repo):
+                process_repo(repo, args.search_limit, args.results_limit, args.type, args.classifier, args.timeout)
+        except TimeoutError as e:
+            print(f"\n{'!'*60}")
+            print(f"TIMEOUT: {e}")
+            print(f"{'!'*60}\n")
+            print(f"Skipping {repo} and continuing to next repository...")
+            # Continue to next repo
         except Exception as e:
             print(f"Failed to process {repo}: {e}")
             # Continue to next repo

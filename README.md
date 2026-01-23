@@ -58,6 +58,11 @@ All mining scripts now use a **unified JSON format** to ensure consistency:
   - `--results-limit`: Maximum number of valid results to find (stops after finding this many valid pairs/updates)
   - At least one limit must be specified
   - Both limits can be used together
+- **Timeout Option** (`--timeout`):
+  - Per-repository timeout in seconds (default: 120)
+  - If a repository exceeds the timeout, it is skipped and processing continues with the next repository
+  - Prevents individual repositories from hanging indefinitely
+  - Example: `--timeout 300` for 5-minute timeout
 - **Classification Options** (`--classifier`): Only applies to `fixes` mining type
   - `simple`: Heuristic classification only (fast)
   - `ai`: AI classification with Gemini (requires simple as prerequisite)
@@ -77,6 +82,9 @@ All mining scripts now use a **unified JSON format** to ensure consistency:
   # Search through 200 PRs or until 50 valid pairs found (whichever comes first)
   python3 run_pipeline.py android/nowinandroid --search-limit 200 --results-limit 50 --type fixes
   
+  # Run with custom timeout (5 minutes)
+  python3 run_pipeline.py android/nowinandroid --search-limit 100 --type fixes --timeout 300
+  
   # Run with clean (deletes all previous results first)
   python3 run_pipeline.py android/nowinandroid --search-limit 100 --type fixes --clean
   
@@ -89,7 +97,11 @@ All mining scripts now use a **unified JSON format** to ensure consistency:
 - **Usage (Multi-Repo)**:
   Create a file `repos.txt` with one repo per line, then:
   ```bash
+  # Process multiple repos with 2-minute timeout per repo (default)
   python3 run_pipeline.py repos.txt --search-limit 100 --type both --clean
+  
+  # Process with longer timeout for slow repos
+  python3 run_pipeline.py repos.txt --search-limit 100 --type both --timeout 600
   ```
   Results will be saved in `results/{owner}_{name}/`, state files in `state/`.
 
