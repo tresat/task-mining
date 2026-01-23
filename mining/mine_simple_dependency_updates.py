@@ -482,7 +482,7 @@ class SimpleDependencyMiner:
                 result = {
                     "repo_url": f"https://github.com/{self.owner}/{self.name}",
                     "from_commit": parent_oid,
-                    "from_msg": "",  # We don't have parent message easily
+                    "from_msg": "",  # Parent message not available without additional API call
                     "to_commit": oid,
                     "to_msg": msg,
                     "files_changed": [{
@@ -605,7 +605,7 @@ class SimpleDependencyMiner:
                 result = {
                     "repo_url": f"https://github.com/{self.owner}/{self.name}",
                     "from_commit": parent_oid,
-                    "from_msg": "",  # We don't have parent message easily
+                    "from_msg": "",  # Parent message not available without additional API call
                     "to_commit": oid,
                     "to_msg": msg,
                     "files_changed": [{

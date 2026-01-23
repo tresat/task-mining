@@ -265,10 +265,16 @@ def main():
     
     print(f"Processing {len(repos)} repository/repositories with {args.timeout} second timeout per repo\n")
     
-    # Prime cache for all repos first
+    # Prime cache for all repos first (with timeout protection)
     for repo in repos:
         try:
-            prime_cache_for_repo(repo, args.type)
+            with timeout_context(args.timeout, repo):
+                prime_cache_for_repo(repo, args.type)
+        except TimeoutError as e:
+            print(f"\n{'!'*60}")
+            print(f"TIMEOUT during cache priming: {e}")
+            print(f"{'!'*60}\n")
+            print(f"Skipping cache priming for {repo}, will fetch from GitHub during mining...")
         except Exception as e:
             print(f"Failed to prime cache for {repo}: {e}")
             # Continue to next repo
