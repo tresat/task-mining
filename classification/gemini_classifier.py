@@ -149,6 +149,10 @@ class GeminiClassifier:
                 if ai_tag not in pair["tags"]:
                     pair["tags"].append(ai_tag)
             
+            # If there was an error, set category to "Unknown"
+            if error:
+                pair["category"] = "Unknown"
+            
             pair["error"] = error
             processed_commits.add(to_commit)
             new_count += 1

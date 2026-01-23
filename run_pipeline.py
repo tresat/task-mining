@@ -311,7 +311,8 @@ def main():
     else:
         repos = [args.repo_or_file]
     
-    print(f"Processing {len(repos)} repository/repositories with {args.timeout} second timeout per repo\n")
+    repo_word = "repository" if len(repos) == 1 else "repositories"
+    print(f"Processing {len(repos)} {repo_word} with {args.timeout} second timeout per repo\n")
     
     # Prime cache for all repos first (with timeout protection)
     for repo in repos:
