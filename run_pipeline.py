@@ -2,6 +2,7 @@ import argparse
 import subprocess
 import sys
 import os
+import json
 import signal
 from contextlib import contextmanager
 from mining.common import load_env
@@ -88,9 +89,13 @@ def run_mining(repo, search_limit, results_limit, mining_type, output_dir, state
     Returns:
         Path to the mining output file to use for classification, or None
     """
-    # Define filenames within the repo-specific directory
-    mining_output = os.path.join(output_dir, "mining_results.json")
-    simple_dep_output = os.path.join(output_dir, "simple_dependency_updates.json")
+    # Get owner and name for per_repo structure
+    if "/" not in repo:
+        return None
+    owner, name = repo.split("/", 1)
+    
+    # New per_repo structure
+    per_repo_output = os.path.join(output_dir, "per_repo", f"{owner}_{name}.json")
     
     # Build limit arguments
     limit_args = []
@@ -100,7 +105,6 @@ def run_mining(repo, search_limit, results_limit, mining_type, output_dir, state
         limit_args.extend(["--results-limit", str(results_limit)])
     
     # Step 1: Mine based on type
-    # Determine which mining output to use for classification
     classification_input = None
     
     if mining_type == "fixes":
@@ -108,30 +112,28 @@ def run_mining(repo, search_limit, results_limit, mining_type, output_dir, state
             ["python3", "-m", "mining.mine_fixes", repo] + limit_args + ["--output", "results", "--state", state_dir],
             f"Step 1: Mining 'Bad -> Good' Pairs for {repo}"
         )
-        classification_input = mining_output
+        classification_input = per_repo_output
     elif mining_type == "simple-dep-updates":
         run_step(
             ["python3", "-m", "mining.mine_simple_dependency_updates", repo] + limit_args + ["--output", "results", "--state", state_dir],
             f"Step 1: Mining Simple Dependency Updates for {repo}"
         )
-        classification_input = simple_dep_output
+        classification_input = per_repo_output
     
     return classification_input
 
-def run_classification(repo, classifier, classification_input, output_dir):
+def run_classification(repo, classifier, classification_input):
     """
     Run Steps 2 and 2b: Classification based on the specified classifier.
+    Edits the per_repo file in-place.
     """
-    if not classification_input:
+    if not classification_input or not os.path.exists(classification_input):
         return
-    
-    analyzed_output = os.path.join(output_dir, "analyzed_results.json")
-    ai_output = os.path.join(output_dir, "ai_classified_results.json")
     
     # Step 2: Simple/Heuristic Classification (runs on any mining type)
     if classifier == "simple":
         run_step(
-            ["python3", "-m", "classification.analyze_pairs", repo, "--input", classification_input, "--output", analyzed_output],
+            ["python3", "-m", "classification.analyze_pairs", repo, "--input", classification_input],
             f"Step 2: Running Simple/Heuristic Classification for {repo}"
         )
     
@@ -139,11 +141,11 @@ def run_classification(repo, classifier, classification_input, output_dir):
     elif classifier == "ai":
         # AI classifier needs analyzed results, so run simple first as prerequisite
         run_step(
-            ["python3", "-m", "classification.analyze_pairs", repo, "--input", classification_input, "--output", analyzed_output],
+            ["python3", "-m", "classification.analyze_pairs", repo, "--input", classification_input],
             f"Step 2: Running Simple/Heuristic Classification for {repo} (prerequisite for AI)"
         )
         run_step(
-            ["python3", "-m", "classification.gemini_classifier", repo, "--input", analyzed_output, "--output", ai_output],
+            ["python3", "-m", "classification.gemini_classifier", repo, "--input", classification_input],
             f"Step 2b: Running AI Classification (Gemini) for {repo}"
         )
 
@@ -157,7 +159,7 @@ def process_repo(repo, search_limit, results_limit, mining_type, classifier, tim
         return
 
     owner, name = repo.split("/", 1)
-    output_dir = os.path.join("results", f"{owner}_{name}")
+    output_dir = "results"
     state_dir = ".state"
     os.makedirs(output_dir, exist_ok=True)
     os.makedirs(state_dir, exist_ok=True)
@@ -166,7 +168,49 @@ def process_repo(repo, search_limit, results_limit, mining_type, classifier, tim
     classification_input = run_mining(repo, search_limit, results_limit, mining_type, output_dir, state_dir)
     
     # Steps 2 and 2b: Classification
-    run_classification(repo, classifier, classification_input, output_dir)
+    run_classification(repo, classifier, classification_input)
+
+def aggregate_results():
+    """
+    Step 3: Aggregation - Combine all per_repo files into a single results.json
+    """
+    print(f"\n{'='*60}")
+    print("Step 3: Aggregating Results")
+    print(f"{'='*60}\n")
+    
+    per_repo_dir = os.path.join("results", "per_repo")
+    output_file = os.path.join("results", "results.json")
+    
+    if not os.path.exists(per_repo_dir):
+        print(f"No per_repo directory found at {per_repo_dir}")
+        return
+    
+    all_results = []
+    file_count = 0
+    
+    # Read all JSON files from per_repo directory
+    for filename in os.listdir(per_repo_dir):
+        if filename.endswith(".json"):
+            filepath = os.path.join(per_repo_dir, filename)
+            try:
+                with open(filepath, 'r') as f:
+                    data = json.load(f)
+                    if isinstance(data, list):
+                        all_results.extend(data)
+                        file_count += 1
+                        print(f"Added {len(data)} results from {filename}")
+                    else:
+                        print(f"Warning: {filename} does not contain a list, skipping")
+            except Exception as e:
+                print(f"Error reading {filename}: {e}")
+    
+    # Write aggregated results
+    if all_results:
+        with open(output_file, 'w') as f:
+            json.dump(all_results, f, indent=2)
+        print(f"\n✓ Aggregated {len(all_results)} total results from {file_count} repositories into {output_file}")
+    else:
+        print("\nNo results to aggregate")
 
 def validate_tokens(classifier):
     """
@@ -292,6 +336,9 @@ def main():
         except Exception as e:
             print(f"Failed to process {repo}: {e}")
             # Continue to next repo
+    
+    # Step 3: Aggregate all results into a single file
+    aggregate_results()
             
     print("\nPipeline Complete!")
 

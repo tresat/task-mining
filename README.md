@@ -56,7 +56,7 @@ python3 run_pipeline.py owner/repo --search-limit 100
 
 ## Output Format
 
-All mining scripts now use a **unified JSON format** to ensure consistency:
+All mining scripts now use a **unified JSON format** with date fields and category placeholders:
 
 ```json
 {
@@ -65,8 +65,10 @@ All mining scripts now use a **unified JSON format** to ensure consistency:
   "repo_url": "https://github.com/owner/repo",
   "from_commit": "abc123",
   "from_msg": "Initial implementation",
+  "from_date": "2024-01-01T12:00:00Z",
   "to_commit": "def456",
   "to_msg": "Fix build issue",
+  "to_date": "2024-01-02T12:00:00Z",
   "files_changed": [
     {
       "filename": "build.gradle",
@@ -74,16 +76,28 @@ All mining scripts now use a **unified JSON format** to ensure consistency:
       "from_line_contents": "version = \"1.0.0\"",
       "to_line_contents": "version = \"1.1.0\""
     }
-  ]
+  ],
+  "category": null,
+  "sub_category": null
 }
 ```
 
 **Note:** 
 - `repo_url` contains the GitHub repository URL (e.g., `https://github.com/owner/repo`)
+- `from_date` and `to_date` are ISO 8601 timestamps from GitHub's `committedDate` field
+  - For PR-based mining: `from_date` is the bad commit's date, `to_date` is the good commit's date
+  - For commit-based mining: `from_date` is the parent commit's date, `to_date` is the current commit's date
 - `files_changed` is always an array, even for single-file changes
-- For PR-based mining, `files_changed` is initially empty and can be populated by classification scripts
+- For PR-based mining, `files_changed` is initially empty and populated by classification scripts
 - For commit-based mining, `files_changed` contains detailed line-level change information
 - Fields not applicable to a specific mining type (e.g., `pr_id` for commit-based mining) are left empty or null
+- `category` and `sub_category` are initialized to `null` and populated by classification steps
+
+## Output Structure
+
+Results are now organized as follows:
+- `results/per_repo/{owner}_{name}.json` - Individual repository results (one file per repo, regardless of mining type)
+- `results/results.json` - Aggregated results from all repositories (created at the end of the pipeline)
 
 ## Scripts
 
@@ -93,9 +107,10 @@ All mining scripts now use a **unified JSON format** to ensure consistency:
 **Pipeline Steps:**
 - **Step 0a**: Cache Priming - Automatically primes cache with recent PRs/commits (always enabled)
 - **Step 0b**: Token Validation - Validates that required environment tokens (GITHUB_TOKEN, GEMINI_API_KEY) are set
-- **Step 1**: Mining - Extracts data based on `--type` parameter (uses cache when available)
-- **Step 2**: Simple/Heuristic Classification - Analyzes mining results
-- **Step 2b**: AI Classification - Deepens analysis using Gemini (requires GEMINI_API_KEY)
+- **Step 1**: Mining - Extracts data based on `--type` parameter (uses cache when available), outputs to `results/per_repo/{owner}_{name}.json`
+- **Step 2**: Simple/Heuristic Classification - Analyzes mining results in-place, updates `category` field
+- **Step 2b**: AI Classification - Deepens analysis using Gemini (requires GEMINI_API_KEY), updates `sub_category` field in-place
+- **Step 3**: Aggregation - Combines all per_repo files into `results/results.json`
 
 **Parameters:**
 - **Mining Types** (`--type`): Controls Step 1
@@ -167,13 +182,13 @@ All mining scripts now use a **unified JSON format** to ensure consistency:
   # Clean cache before processing multiple repos
   python3 run_pipeline.py repos.txt --search-limit 100 --type fixes --clean-cache
   ```
-  Results will be saved in `results/{owner}_{name}/`, state files in `.state/`.
+  Results will be saved in `results/per_repo/{owner}_{name}.json`, and aggregated into `results/results.json` at the end.
 
 ### 1. `mining/mine_fixes.py` (The Fixes Miner)
 **Function**: Identifies "Self-Correction" pairs in merged PRs.
 - **Logic**: Scans PRs for a sequence of `Failure -> Success` commits.
 - **Input**: GitHub Repo (owner/name) OR a text file with a list of repos (one per line)
-- **Output**: `results/{owner}_{name}/mining_results.json`
+- **Output**: `results/per_repo/{owner}_{name}.json` with date fields and null category fields
 - **State Files**: Stored in `.state/{owner}_{name}_mining_state.json`
 - **Usage (Single Repo)**:
   ```bash
@@ -189,7 +204,7 @@ All mining scripts now use a **unified JSON format** to ensure consistency:
 - **Logic**: Scans individual commits (not PRs) for single-line dependency version increases in `build.gradle`, `build.gradle.kts`, or `libs.versions.toml` files where both the commit and its parent have successful builds.
 - **Branch Detection**: Automatically detects the default branch (tries `main` first, then `master`).
 - **Input**: GitHub Repo (owner/name) OR a text file with a list of repos (one per line)
-- **Output**: `results/{owner}_{name}/simple_dependency_updates.json`
+- **Output**: `results/per_repo/{owner}_{name}.json` with date fields and null category fields
 - **State Files**: Stored in `.state/{owner}_{name}_simple_dependency_state.json`
 - **Usage (Single Repo)**:
   ```bash
@@ -200,28 +215,33 @@ All mining scripts now use a **unified JSON format** to ensure consistency:
   ```bash
   python3 -m mining.mine_simple_dependency_updates repos.txt --limit 1000
   ```
-  Results will be saved in `results/{owner}_{name}/simple_dependency_updates.json`.
+  Results will be saved in `results/per_repo/{owner}_{name}.json`.
 
 ### 2. `classification/analyze_pairs.py` (The Simple/Heuristic Classifier)
 **Function**: Classifies pairs based on changed files (Fast & Cheap).
 - **Logic**: Checks if `build.gradle`, `libs.versions.toml`, or other build files were modified.
 - **Categories**: `Dependency Update` vs `Other`.
-- **Input**: Mining results in unified format
-- **Output**: `analyzed_results.json`
+- **Input**: `results/per_repo/{owner}_{name}.json` (auto-detected from repo name)
+- **Output**: Updates the same file in-place, setting the `category` field
 - **Usage**:
   ```bash
   python3 -m classification.analyze_pairs android/nowinandroid
+  # Or with custom input:
+  python3 -m classification.analyze_pairs android/nowinandroid --input custom_file.json
   ```
 
 ### 2b. `classification/gemini_classifier.py` (The AI Classifier)
 **Function**: Classifies pairs using an LLM (Gemini) for deeper understanding.
-- **Logic**: Fetches the actual code diff and asks Gemini: "Is this a dependency update?".
-- **Benefit**: Can distinguish between a simple version bump and a logic fix in a build file.
-- **Input**: `analyzed_results.json`
-- **Output**: `ai_classified_results.json`
+- **Logic**: Fetches the actual code diff and asks Gemini for sub-categorization.
+- **Sub-categories**: `Dependency Update`, `Bug Fix`, `Feature`, `Refactor`, `Other`.
+- **Benefit**: Can distinguish between different types of changes beyond simple file-based heuristics.
+- **Input**: `results/per_repo/{owner}_{name}.json` (auto-detected from repo name)
+- **Output**: Updates the same file in-place, setting the `sub_category` field
 - **Usage**:
   ```bash
   python3 -m classification.gemini_classifier android/nowinandroid
+  # Or with custom input:
+  python3 -m classification.gemini_classifier android/nowinandroid --input custom_file.json
   ```
 
 ## Resumability
@@ -229,15 +249,15 @@ All mining scripts support resuming if interrupted.
 
 - **mining/mine_fixes.py**: Uses state files in the `.state/` directory (e.g., `.state/{owner}_{name}_mining_state.json`).
   - To resume: Just run the same command again.
-  - To restart: Delete the corresponding state file in `.state/` and the results in `results/{owner}_{name}/mining_results.json`.
+  - To restart: Delete the corresponding state file in `.state/` and the results in `results/per_repo/{owner}_{name}.json`.
 
 - **mining/mine_simple_dependency_updates.py**: Uses state files in the `.state/` directory (e.g., `.state/{owner}_{name}_simple_dependency_state.json`).
   - To resume: Just run the same command again.
-  - To restart: Delete the corresponding state file in `.state/` and the results in `results/{owner}_{name}/simple_dependency_updates.json`.
+  - To restart: Delete the corresponding state file in `.state/` and the results in `results/per_repo/{owner}_{name}.json`.
 
-- **gemini_classifier.py**: Checks `ai_classified_results.json` for existing entries.
+- **gemini_classifier.py**: Checks for existing `sub_category` values in the input file.
   - To resume: Run the command again; it skips already classified pairs.
-  - To restart: Delete `ai_classified_results.json`.
+  - To restart: Delete or reset the `sub_category` field in the per_repo JSON file.
 
 ## Setup
 

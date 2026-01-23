@@ -37,12 +37,12 @@ class GeminiClassifier:
             return ""
 
     def classify_with_gemini(self, message: str, diff: str) -> str:
-        """Asks Gemini if this is a dependency update using REST API."""
+        """Asks Gemini for sub-categorization using REST API."""
         if not diff:
             return "Unknown (No Diff)"
             
         prompt_text = f"""
-        Analyze the following commit to determine if it is purely a "Dependency Update" (updating libraries, versions, etc.).
+        Analyze the following commit to determine its sub-category.
         
         Commit Message:
         {message}
@@ -50,8 +50,14 @@ class GeminiClassifier:
         Diff Snippet:
         {diff}
         
-        Is this a dependency update? 
-        Answer ONLY with "YES" or "NO".
+        Classify this commit into one of these sub-categories:
+        - "Dependency Update" - Version updates, library changes
+        - "Bug Fix" - Fixing errors or issues
+        - "Feature" - Adding new functionality
+        - "Refactor" - Code restructuring without changing functionality
+        - "Other" - Doesn't fit other categories
+        
+        Answer with ONLY the sub-category name from the list above.
         """
         
         payload = {
@@ -65,13 +71,18 @@ class GeminiClassifier:
             if response.status_code == 200:
                 data = response.json()
                 try:
-                    answer = data["candidates"][0]["content"]["parts"][0]["text"].strip().upper()
-                    if "YES" in answer:
-                        return "YES"
-                    elif "NO" in answer:
-                        return "NO"
+                    answer = data["candidates"][0]["content"]["parts"][0]["text"].strip()
+                    # Extract the sub-category from the response
+                    if "Dependency Update" in answer:
+                        return "Dependency Update"
+                    elif "Bug Fix" in answer:
+                        return "Bug Fix"
+                    elif "Feature" in answer:
+                        return "Feature"
+                    elif "Refactor" in answer:
+                        return "Refactor"
                     else:
-                        return "UNCERTAIN"
+                        return "Other"
                 except (KeyError, IndexError) as e:
                     print(f"Error parsing Gemini response: {e}")
                     return "ERROR"
@@ -82,7 +93,8 @@ class GeminiClassifier:
             print(f"Gemini Request Error: {e}")
             return "ERROR"
 
-    def run(self, input_file: str, output_file: str):
+    def run(self, input_file: str):
+        """Classifies pairs in-place, updating the sub_category field."""
         if not os.path.exists(input_file):
             print(f"Error: Input file {input_file} not found.")
             return
@@ -90,22 +102,16 @@ class GeminiClassifier:
         with open(input_file, 'r') as f:
             pairs = json.load(f)
             
-        # Load existing results to skip already processed ones
-        existing_results = []
+        # Track which commits have been processed with sub_category
         processed_commits = set()
+        for pair in pairs:
+            to_commit = pair.get("to_commit") or pair.get("good_commit")
+            if pair.get("sub_category") is not None:
+                processed_commits.add(to_commit)
+                
+        print(f"Found {len(processed_commits)} already classified pairs.")
+        print(f"Classifying {len(pairs) - len(processed_commits)} remaining pairs with Gemini...")
         
-        if os.path.exists(output_file):
-            try:
-                with open(output_file, 'r') as f:
-                    existing_results = json.load(f)
-                    processed_commits = {r.get("to_commit") or r.get("good_commit") for r in existing_results}
-                    print(f"Loaded {len(existing_results)} existing classifications.")
-            except Exception:
-                print("Warning: Could not load existing results, starting fresh.")
-
-        print(f"Classifying {len(pairs)} pairs with Gemini...")
-        
-        results = existing_results
         new_count = 0
         
         for i, pair in enumerate(pairs):
@@ -122,32 +128,30 @@ class GeminiClassifier:
             
             print(f"  Asking Gemini...")
             ai_verdict = self.classify_with_gemini(msg, diff)
-            print(f"  Verdict: {ai_verdict}")
+            print(f"  Sub-category: {ai_verdict}")
             
-            pair["ai_is_dependency_update"] = ai_verdict
-            results.append(pair)
+            pair["sub_category"] = ai_verdict
             processed_commits.add(to_commit)
             new_count += 1
             
             # Save incrementally every 5 items
             if new_count % 5 == 0:
-                with open(output_file, 'w') as f:
-                    json.dump(results, f, indent=2)
-                print(f"  [Saved progress to {output_file}]")
+                with open(input_file, 'w') as f:
+                    json.dump(pairs, f, indent=2)
+                print(f"  [Saved progress to {input_file}]")
             
             time.sleep(1) # Rate limit niceness
             
         # Final save
-        with open(output_file, 'w') as f:
-            json.dump(results, f, indent=2)
-        print(f"Saved all AI classification results to {output_file}")
+        with open(input_file, 'w') as f:
+            json.dump(pairs, f, indent=2)
+        print(f"Updated {input_file} with AI sub-category classifications")
 
 def main():
     load_env()
     parser = argparse.ArgumentParser(description="Gemini Classifier")
     parser.add_argument("repo", help="owner/name")
-    parser.add_argument("--input", default="analyzed_results.json")
-    parser.add_argument("--output", default="ai_classified_results.json")
+    parser.add_argument("--input", help="Input file path (default: results/per_repo/{owner}_{name}.json)")
     
     args = parser.parse_args()
     
@@ -159,8 +163,19 @@ def main():
         return
         
     owner, name = args.repo.split("/", 1)
+    
+    # Use per_repo structure if input not specified
+    if args.input:
+        input_file = args.input
+    else:
+        input_file = os.path.join("results", "per_repo", f"{owner}_{name}.json")
+    
+    if not os.path.exists(input_file):
+        print(f"Error: Input file {input_file} not found.")
+        return
+    
     classifier = GeminiClassifier(gh_token, gemini_key, owner, name)
-    classifier.run(args.input, args.output)
+    classifier.run(input_file)
 
 if __name__ == "__main__":
     main()

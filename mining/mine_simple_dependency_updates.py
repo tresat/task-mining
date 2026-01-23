@@ -32,6 +32,7 @@ query ($owner: String!, $name: String!, $ref: String!, $cursor: String, $limit: 
               parents(first: 1) {
                 nodes {
                   oid
+                  committedDate
                   statusCheckRollup {
                     state
                   }
@@ -483,14 +484,18 @@ class SimpleDependencyMiner:
                     "repo_url": f"https://github.com/{self.owner}/{self.name}",
                     "from_commit": parent_oid,
                     "from_msg": "",  # Parent message not available without additional API call
+                    "from_date": parent.get("committedDate", ""),
                     "to_commit": oid,
                     "to_msg": msg,
+                    "to_date": commit["committedDate"],
                     "files_changed": [{
                         "filename": file_info.get("filename"),
                         "line_number": version_change["line_number"],
                         "from_line_contents": version_change["from_line"],
                         "to_line_contents": version_change["to_line"]
-                    }]
+                    }],
+                    "category": None,
+                    "sub_category": None
                 }
                 
                 # Check for duplicates before adding
@@ -606,14 +611,18 @@ class SimpleDependencyMiner:
                     "repo_url": f"https://github.com/{self.owner}/{self.name}",
                     "from_commit": parent_oid,
                     "from_msg": "",  # Parent message not available without additional API call
+                    "from_date": parent.get("committedDate", ""),
                     "to_commit": oid,
                     "to_msg": msg,
+                    "to_date": commit["committedDate"],
                     "files_changed": [{
                         "filename": file_info.get("filename"),
                         "line_number": version_change["line_number"],
                         "from_line_contents": version_change["from_line"],
                         "to_line_contents": version_change["to_line"]
-                    }]
+                    }],
+                    "category": None,
+                    "sub_category": None
                 }
                 
                 # Check for duplicates before adding
@@ -650,14 +659,14 @@ def process_repo(repo: str, token: str, search_limit: Optional[int], results_lim
         
     owner, name = repo.split("/", 1)
     
-    # Create repo-specific output directory
-    repo_output_dir = os.path.join(output_dir, f"{owner}_{name}")
-    ensure_directory(repo_output_dir)
+    # Create per_repo output directory
+    per_repo_dir = os.path.join(output_dir, "per_repo")
+    ensure_directory(per_repo_dir)
     
     # Create state directory if it doesn't exist
     ensure_directory(state_dir)
     
-    output_file = os.path.join(repo_output_dir, "simple_dependency_updates.json")
+    output_file = os.path.join(per_repo_dir, f"{owner}_{name}.json")
     state_file = os.path.join(state_dir, f"{owner}_{name}_simple_dependency_state.json")
     
     miner = SimpleDependencyMiner(token, owner, name)

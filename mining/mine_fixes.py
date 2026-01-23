@@ -264,9 +264,13 @@ class GitHubMiner:
                                 "repo_url": f"https://github.com/{self.owner}/{self.name}",
                                 "from_commit": bad_commit["oid"],
                                 "from_msg": bad_commit["message"].split('\n')[0],
+                                "from_date": bad_commit["committedDate"],
                                 "to_commit": oid,
                                 "to_msg": msg,
-                                "files_changed": []  # Not available for PR-based mining; can be populated by classification
+                                "to_date": commit["committedDate"],
+                                "files_changed": [],  # Not available for PR-based mining; can be populated by classification
+                                "category": None,
+                                "sub_category": None
                             }
                             # Check for duplicates before adding
                             if not any(r['to_commit'] == oid for r in results):
@@ -361,9 +365,13 @@ class GitHubMiner:
                                 "repo_url": f"https://github.com/{self.owner}/{self.name}",
                                 "from_commit": bad_commit["oid"],
                                 "from_msg": bad_commit["message"].split('\n')[0],
+                                "from_date": bad_commit["committedDate"],
                                 "to_commit": oid,
                                 "to_msg": msg,
-                                "files_changed": []  # Not available for PR-based mining; can be populated by classification
+                                "to_date": commit["committedDate"],
+                                "files_changed": [],  # Not available for PR-based mining; can be populated by classification
+                                "category": None,
+                                "sub_category": None
                             }
                             # Check for duplicates before adding
                             if not any(r['to_commit'] == oid for r in results) and not any(r['to_commit'] == oid for r in batch_results):
@@ -401,14 +409,14 @@ def process_repo(repo: str, token: str, search_limit: Optional[int], results_lim
         
     owner, name = repo.split("/", 1)
     
-    # Create repo-specific output directory
-    repo_output_dir = os.path.join(output_dir, f"{owner}_{name}")
-    ensure_directory(repo_output_dir)
+    # Create per_repo output directory
+    per_repo_dir = os.path.join(output_dir, "per_repo")
+    ensure_directory(per_repo_dir)
     
     # Create state directory if it doesn't exist
     ensure_directory(state_dir)
     
-    output_file = os.path.join(repo_output_dir, "mining_results.json")
+    output_file = os.path.join(per_repo_dir, f"{owner}_{name}.json")
     state_file = os.path.join(state_dir, f"{owner}_{name}_mining_state.json")
     
     miner = GitHubMiner(token, owner, name)

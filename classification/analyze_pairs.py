@@ -51,7 +51,8 @@ class PairAnalyzer:
         pair["category"] = "Dependency Update" if is_dependency_update else "Other"
         return pair
 
-    def analyze(self, input_file: str, output_file: str):
+    def analyze(self, input_file: str):
+        """Analyzes pairs in-place, updating the category field."""
         with open(input_file, 'r') as f:
             pairs = json.load(f)
             
@@ -70,16 +71,16 @@ class PairAnalyzer:
                 except Exception as e:
                     print(f"Analysis failed for a pair: {e}")
                     
-        with open(output_file, 'w') as f:
+        # Write back to the same file (in-place edit)
+        with open(input_file, 'w') as f:
             json.dump(analyzed_pairs, f, indent=2)
-        print(f"Saved analyzed results to {output_file}")
+        print(f"Updated {input_file} with category classifications")
 
 def main():
     load_env()
     parser = argparse.ArgumentParser(description="Analyze Mined Pairs")
     parser.add_argument("repo", help="owner/name")
-    parser.add_argument("--input", default="mining_results.json")
-    parser.add_argument("--output", default="analyzed_results.json")
+    parser.add_argument("--input", help="Input file path (default: results/per_repo/{owner}_{name}.json)")
     
     args = parser.parse_args()
     
@@ -89,8 +90,19 @@ def main():
         return
         
     owner, name = args.repo.split("/", 1)
+    
+    # Use per_repo structure if input not specified
+    if args.input:
+        input_file = args.input
+    else:
+        input_file = os.path.join("results", "per_repo", f"{owner}_{name}.json")
+    
+    if not os.path.exists(input_file):
+        print(f"Error: Input file {input_file} not found.")
+        return
+    
     analyzer = PairAnalyzer(token, owner, name)
-    analyzer.analyze(args.input, args.output)
+    analyzer.analyze(input_file)
 
 if __name__ == "__main__":
     main()
