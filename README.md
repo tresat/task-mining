@@ -76,9 +76,9 @@ Multiple scripts support resuming if interrupted.
   - To resume: Just run the same command again.
   - To restart: Delete `mining_state.json` and `mining_results.json`.
 
-- **mine_simple_dependency_updates.py**: Uses a state file (default `simple_dependency_state.json`) to save the cursor.
+- **mine_simple_dependency_updates.py**: Uses state files in the `state/` directory (e.g., `state/{owner}_{name}_simple_dependency_state.json`).
   - To resume: Just run the same command again.
-  - To restart: Delete `simple_dependency_state.json` and `results/simple_dependency_updates.json`.
+  - To restart: Delete the corresponding state file in `state/` and the results in `results/{owner}_{name}/simple_dependency_updates.json`.
 
 - **gemini_classifier.py**: Checks `ai_classified_results.json` for existing entries.
   - To resume: Run the command again; it skips already classified pairs.

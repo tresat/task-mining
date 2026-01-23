@@ -532,6 +532,9 @@ def process_repo(repo: str, token: str, limit: int, output_dir: str, state_dir: 
     repo_output_dir = os.path.join(output_dir, f"{owner}_{name}")
     os.makedirs(repo_output_dir, exist_ok=True)
     
+    # Create state directory if it doesn't exist
+    os.makedirs(state_dir, exist_ok=True)
+    
     output_file = os.path.join(repo_output_dir, "simple_dependency_updates.json")
     state_file = os.path.join(state_dir, f"{owner}_{name}_simple_dependency_state.json")
     
@@ -553,7 +556,7 @@ def main():
     parser.add_argument("--token", help="GitHub PAT (optional if GITHUB_TOKEN env var is set)")
     parser.add_argument("--limit", type=int, default=1000, help="Number of commits to scan")
     parser.add_argument("--output", default="results", help="Output directory for results")
-    parser.add_argument("--state", default=".", help="Directory for state files")
+    parser.add_argument("--state", default="state", help="Directory for state files (default: state)")
     parser.add_argument("--ref", default=None, help="Git ref to scan (e.g., refs/heads/main). If not specified, auto-detects main or master")
     
     args = parser.parse_args()
