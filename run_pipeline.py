@@ -15,7 +15,7 @@ def run_step(command, description):
         print(f"Error during '{description}': {e}")
         sys.exit(1)
 
-def process_repo(repo, limit, clean, mining_type, classifier):
+def process_repo(repo, limit, mining_type, classifier):
     print(f"\n{'#'*60}")
     print(f"PROCESSING REPO: {repo}")
     print(f"{'#'*60}\n")
@@ -37,14 +37,6 @@ def process_repo(repo, limit, clean, mining_type, classifier):
     simple_dep_state = os.path.join(state_dir, f"{owner}_{name}_simple_dependency_state.json")
     analyzed_output = os.path.join(output_dir, "analyzed_results.json")
     ai_output = os.path.join(output_dir, "ai_classified_results.json")
-    
-    # Clean if requested
-    if clean:
-        print(f"Cleaning up previous results in {output_dir} and {state_dir}...")
-        for f in [mining_output, mining_state, simple_dep_output, simple_dep_state, analyzed_output, ai_output]:
-            if os.path.exists(f):
-                os.remove(f)
-                print(f"Removed {f}")
     
     # Step 1: Mine based on type
     if mining_type == "fixes":
@@ -111,13 +103,31 @@ def main():
     parser = argparse.ArgumentParser(description="Run the full Task Mining Pipeline")
     parser.add_argument("repo_or_file", help="GitHub repository (owner/name) OR path to a text file with a list of repos")
     parser.add_argument("--limit", type=int, default=100, help="Limit for mining PRs per repo")
-    parser.add_argument("--clean", action="store_true", help="Clean previous results/state before running")
+    parser.add_argument("--clean", action="store_true", help="Clean previous results/state before running (deletes entire results/ and state/ directories)")
     parser.add_argument("--type", default="fixes", choices=["fixes", "simple-dep-updates", "both"],
                        help="Type of mining to run: 'fixes' (PR-based bad->good), 'simple-dep-updates' (single-line dependency updates), or 'both' (default: fixes)")
     parser.add_argument("--classifier", default="both", choices=["simple", "ai", "both"],
                        help="Classification to run: 'simple' (heuristic), 'ai' (Gemini), or 'both' (default: both). Only applies to 'fixes' mining type.")
     
     args = parser.parse_args()
+    
+    # Clean entire results and state directories if requested (done first, before processing any repos)
+    if args.clean:
+        import shutil
+        results_dir = "results"
+        state_dir = "state"
+        
+        if os.path.exists(results_dir):
+            print(f"Cleaning entire {results_dir}/ directory...")
+            shutil.rmtree(results_dir)
+            print(f"Removed {results_dir}/")
+        
+        if os.path.exists(state_dir):
+            print(f"Cleaning entire {state_dir}/ directory...")
+            shutil.rmtree(state_dir)
+            print(f"Removed {state_dir}/")
+        
+        print("Clean complete.\n")
     
     repos = []
     if os.path.isfile(args.repo_or_file):
@@ -129,7 +139,7 @@ def main():
         
     for repo in repos:
         try:
-            process_repo(repo, args.limit, args.clean, args.type, args.classifier)
+            process_repo(repo, args.limit, args.type, args.classifier)
         except Exception as e:
             print(f"Failed to process {repo}: {e}")
             # Continue to next repo

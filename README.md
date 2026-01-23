@@ -57,10 +57,17 @@ All mining scripts now use a **unified JSON format** to ensure consistency:
   - `simple`: Heuristic classification only (fast)
   - `ai`: AI classification with Gemini (requires simple as prerequisite)
   - `both` (default): Runs both simple and AI classification
+- **Clean Option** (`--clean`):
+  - Deletes entire `results/` and `state/` directories before running
+  - Useful for starting fresh or after changing mining parameters
+  - Executes before any mining or classification begins
 - **Usage (Single Repo)**:
   ```bash
   # Run fixes mining with both classifiers
   python3 run_pipeline.py android/nowinandroid --limit 100 --type fixes --classifier both
+  
+  # Run with clean (deletes all previous results first)
+  python3 run_pipeline.py android/nowinandroid --limit 100 --type fixes --clean
   
   # Run only simple classification
   python3 run_pipeline.py android/nowinandroid --limit 100 --type fixes --classifier simple
@@ -71,7 +78,7 @@ All mining scripts now use a **unified JSON format** to ensure consistency:
 - **Usage (Multi-Repo)**:
   Create a file `repos.txt` with one repo per line, then:
   ```bash
-  python3 run_pipeline.py repos.txt --limit 100 --type both
+  python3 run_pipeline.py repos.txt --limit 100 --type both --clean
   ```
   Results will be saved in `results/{owner}_{name}/`, state files in `state/`.
 
