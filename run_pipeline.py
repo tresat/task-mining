@@ -59,16 +59,16 @@ def prime_cache_for_repo(repo, mining_type):
     
     if mining_type == "fixes":
         from mining.mine_fixes import GitHubMiner
-        from mining.cache import CacheManager, prime_pr_cache
+        from mining.cache import CacheManager, prime_pr_cache, MAX_CACHE_ITEMS
         
         miner = GitHubMiner(token, owner, name)
         cache_manager = CacheManager(owner, name, "prs")
         
-        prime_pr_cache(miner, cache_manager, max_items=100)
+        prime_pr_cache(miner, cache_manager, max_items=MAX_CACHE_ITEMS)
         
     elif mining_type == "simple-dep-updates":
         from mining.mine_simple_dependency_updates import SimpleDependencyMiner
-        from mining.cache import CacheManager, prime_commit_cache
+        from mining.cache import CacheManager, prime_commit_cache, MAX_CACHE_ITEMS
         
         miner = SimpleDependencyMiner(token, owner, name)
         cache_manager = CacheManager(owner, name, "commits")
@@ -76,7 +76,7 @@ def prime_cache_for_repo(repo, mining_type):
         # Detect default branch
         ref = miner.get_default_branch()
         
-        prime_commit_cache(miner, cache_manager, ref, max_items=100)
+        prime_commit_cache(miner, cache_manager, ref, max_items=MAX_CACHE_ITEMS)
     
     print(f"Cache priming complete for {repo}\n")
 

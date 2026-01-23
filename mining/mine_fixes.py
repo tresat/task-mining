@@ -336,9 +336,11 @@ class GitHubMiner:
                 
                 # Cache the PR data if cache manager is available
                 if cache_manager and cache_manager.size() < 100:
-                    pr_data = pr.copy()
-                    pr_data["commits"]["nodes"] = commits
-                    cache_manager.set(str(pr_number), pr_data)
+                    from .cache import MAX_CACHE_ITEMS
+                    if cache_manager.size() < MAX_CACHE_ITEMS:
+                        pr_data = pr.copy()
+                        pr_data["commits"]["nodes"] = commits
+                        cache_manager.set(str(pr_number), pr_data)
                 
                 last_bad_commit = None
                 

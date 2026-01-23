@@ -8,6 +8,11 @@ import os
 import json
 from typing import Dict, List, Any, Optional
 
+# Cache configuration constants
+MAX_CACHE_ITEMS = 100  # Maximum number of items to cache per repository
+PR_BATCH_SIZE = 50     # Number of PRs to fetch per batch when priming
+COMMIT_BATCH_SIZE = 100  # Number of commits to fetch per batch when priming
+
 
 class CacheManager:
     """Manages caching of GitHub API responses for a specific repository."""
@@ -130,7 +135,7 @@ class CacheManager:
             print(f"Cleared all caches from {cache_root}/")
 
 
-def prime_pr_cache(miner, cache_manager: CacheManager, max_items: int = 100):
+def prime_pr_cache(miner, cache_manager: CacheManager, max_items: int = MAX_CACHE_ITEMS):
     """
     Prime the PR cache by fetching recent PRs from GitHub.
     
@@ -141,7 +146,7 @@ def prime_pr_cache(miner, cache_manager: CacheManager, max_items: int = 100):
     Args:
         miner: GitHubMiner instance
         cache_manager: CacheManager instance for PRs
-        max_items: Maximum number of items to cache (default: 100)
+        max_items: Maximum number of items to cache (default: MAX_CACHE_ITEMS)
     """
     print(f"Priming PR cache for {miner.owner}/{miner.name}...")
     
@@ -159,7 +164,7 @@ def prime_pr_cache(miner, cache_manager: CacheManager, max_items: int = 100):
     items_fetched = 0
     
     while cache_manager.size() < max_items:
-        batch_size = min(50, max_items - cache_manager.size())
+        batch_size = min(PR_BATCH_SIZE, max_items - cache_manager.size())
         
         variables = {
             "owner": miner.owner,
@@ -220,7 +225,7 @@ def prime_pr_cache(miner, cache_manager: CacheManager, max_items: int = 100):
     print(f"Cache priming complete: {items_fetched} new PRs cached ({initial_size} -> {final_size})")
 
 
-def prime_commit_cache(miner, cache_manager: CacheManager, ref: str, max_items: int = 100):
+def prime_commit_cache(miner, cache_manager: CacheManager, ref: str, max_items: int = MAX_CACHE_ITEMS):
     """
     Prime the commit cache by fetching recent commits from GitHub.
     
@@ -232,7 +237,7 @@ def prime_commit_cache(miner, cache_manager: CacheManager, ref: str, max_items: 
         miner: SimpleDependencyMiner instance
         cache_manager: CacheManager instance for commits
         ref: Git ref to scan
-        max_items: Maximum number of items to cache (default: 100)
+        max_items: Maximum number of items to cache (default: MAX_CACHE_ITEMS)
     """
     print(f"Priming commit cache for {miner.owner}/{miner.name}...")
     
@@ -250,7 +255,7 @@ def prime_commit_cache(miner, cache_manager: CacheManager, ref: str, max_items: 
     items_fetched = 0
     
     while cache_manager.size() < max_items:
-        batch_size = min(100, max_items - cache_manager.size())
+        batch_size = min(COMMIT_BATCH_SIZE, max_items - cache_manager.size())
         
         variables = {
             "owner": miner.owner,

@@ -564,8 +564,10 @@ class SimpleDependencyMiner:
                 msg = commit["message"].split('\n')[0]
                 
                 # Cache the commit if cache manager is available
-                if cache_manager and cache_manager.size() < 100:
-                    cache_manager.set(oid, commit)
+                if cache_manager:
+                    from .cache import MAX_CACHE_ITEMS
+                    if cache_manager.size() < MAX_CACHE_ITEMS:
+                        cache_manager.set(oid, commit)
                 
                 # Check if current commit has successful build
                 if not self.is_build_successful(commit):
