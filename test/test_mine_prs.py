@@ -5,11 +5,11 @@ import sys
 # Add parent directory to path to allow importing mining package
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from mining.mine_prs import GitHubMiner
+from mining.mine_prs import PRMiner
 
-class TestGitHubMiner(unittest.TestCase):
+class TestPRMiner(unittest.TestCase):
     def setUp(self):
-        self.miner = GitHubMiner("fake_token", "owner", "repo")
+        self.miner = PRMiner("fake_token", "owner", "repo")
 
     def test_is_build_successful(self):
         # Case 1: StatusCheckRollup says SUCCESS

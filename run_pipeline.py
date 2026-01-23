@@ -42,7 +42,7 @@ def prime_cache_for_repo(repo, mining_type):
     
     Args:
         repo: Repository in owner/name format
-        mining_type: Type of mining ('fixes' or 'simple-dep-updates')
+        mining_type: Type of mining ('prs' or 'commits')
     """
     if "/" not in repo:
         print(f"Skipping invalid repo format: {repo}")
@@ -57,26 +57,26 @@ def prime_cache_for_repo(repo, mining_type):
     
     print(f"\n*** CACHE PRIMING: {repo} ***")
     
-    if mining_type == "fixes":
-        from mining.mine_prs import GitHubMiner
-        from mining.cache import CacheManager, prime_pr_cache, MAX_CACHE_ITEMS
+    if mining_type == "prs":
+        from mining.mine_prs import PRMiner
+        from mining.cache import CacheManager, prime_pr_cache, MAX_CACHE_ITEMS_PRS
         
-        miner = GitHubMiner(token, owner, name)
+        miner = PRMiner(token, owner, name)
         cache_manager = CacheManager(owner, name, "prs")
         
-        prime_pr_cache(miner, cache_manager, max_items=MAX_CACHE_ITEMS)
+        prime_pr_cache(miner, cache_manager, max_items=MAX_CACHE_ITEMS_PRS)
         
-    elif mining_type == "simple-dep-updates":
-        from mining.mine_dep_update_commits import SimpleDependencyMiner
-        from mining.cache import CacheManager, prime_commit_cache, MAX_CACHE_ITEMS
+    elif mining_type == "commits":
+        from mining.mine_commits import CommitMiner
+        from mining.cache import CacheManager, prime_commit_cache, MAX_CACHE_ITEMS_COMMITS
         
-        miner = SimpleDependencyMiner(token, owner, name)
+        miner = CommitMiner(token, owner, name)
         cache_manager = CacheManager(owner, name, "commits")
         
         # Detect default branch
         ref = miner.get_default_branch()
         
-        prime_commit_cache(miner, cache_manager, ref, max_items=MAX_CACHE_ITEMS)
+        prime_commit_cache(miner, cache_manager, ref, max_items=MAX_CACHE_ITEMS_COMMITS)
 
 
 def run_mining(repo, search_limit, results_limit, mining_type, output_dir, state_dir):
@@ -108,17 +108,17 @@ def run_mining(repo, search_limit, results_limit, mining_type, output_dir, state
     # Mine based on type (no header output)
     classification_input = None
     
-    if mining_type == "fixes":
+    if mining_type == "prs":
         run_step(
             ["python3", "-m", "mining.mine_prs", repo] + limit_args + ["--output", "results", "--state", state_dir],
             f"Step 1: Mining 'Bad -> Good' Pairs for {repo}",
             show_header=False
         )
         classification_input = per_repo_output
-    elif mining_type == "simple-dep-updates":
+    elif mining_type == "commits":
         run_step(
-            ["python3", "-m", "mining.mine_dep_update_commits", repo] + limit_args + ["--output", "results", "--state", state_dir],
-            f"Step 1: Mining Simple Dependency Updates for {repo}",
+            ["python3", "-m", "mining.mine_commits", repo] + limit_args + ["--output", "results", "--state", state_dir],
+            f"Step 1: Mining Commit Pairs for {repo}",
             show_header=False
         )
         classification_input = per_repo_output
@@ -260,8 +260,8 @@ def main():
     parser.add_argument("--timeout", type=int, default=120, help="Timeout in seconds for processing each repository (default: 120)")
     parser.add_argument("--clean", action="store_true", help="Clean previous results/state before running (deletes entire results/ and .state/ directories)")
     parser.add_argument("--clean-cache", action="store_true", help="Clean cache before running (deletes entire .cache/ directory)")
-    parser.add_argument("--type", default="fixes", choices=["fixes", "simple-dep-updates"],
-                       help="Type of mining to run (Step 1): 'fixes' (PR-based bad->good) or 'simple-dep-updates' (single-line dependency updates). Default: fixes")
+    parser.add_argument("--type", default="prs", choices=["prs", "commits"],
+                       help="Type of mining to run (Step 1): 'prs' (PR-based bad->good) or 'commits' (commit-based pairs with successful builds). Default: prs")
     parser.add_argument("--classifier", default="simple", choices=["simple", "ai"],
                        help="Classification to run (Steps 2 and 2b): 'simple' (heuristic) or 'ai' (Gemini, automatically runs simple as prerequisite). Runs on the mining results from Step 1. Default: simple")
     
@@ -347,7 +347,7 @@ def main():
     
     print(f"\n{'='*60}")
     print("GENERATING REPORT")
-    print(f"{'='*60}")
+    print(f"{'='*60}\n")
     
     # Step 3: Aggregate all results into a single file
     aggregate_results()

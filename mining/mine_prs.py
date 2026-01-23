@@ -72,7 +72,7 @@ query ($owner: String!, $name: String!, $pr_number: Int!, $cursor: String) {
 }
 """
 
-class GitHubMiner:
+class PRMiner:
     def __init__(self, token: str, repo_owner: str, repo_name: str):
         self.token = token
         self.owner = repo_owner
@@ -434,7 +434,7 @@ def process_repo(repo: str, token: str, search_limit: Optional[int], results_lim
     output_file = os.path.join(per_repo_dir, f"{owner}_{name}.json")
     state_file = os.path.join(state_dir, f"{owner}_{name}_mining_state.json")
     
-    miner = GitHubMiner(token, owner, name)
+    miner = PRMiner(token, owner, name)
     
     # Initialize cache manager if caching is enabled
     cache_manager = None

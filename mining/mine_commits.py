@@ -65,7 +65,7 @@ query ($owner: String!, $name: String!, $oid: String!) {
 }
 """
 
-class SimpleDependencyMiner:
+class CommitMiner:
     def __init__(self, token: str, repo_owner: str, repo_name: str):
         self.token = token
         self.owner = repo_owner
@@ -680,7 +680,7 @@ def process_repo(repo: str, token: str, search_limit: Optional[int], results_lim
     output_file = os.path.join(per_repo_dir, f"{owner}_{name}.json")
     state_file = os.path.join(state_dir, f"{owner}_{name}_simple_dependency_state.json")
     
-    miner = SimpleDependencyMiner(token, owner, name)
+    miner = CommitMiner(token, owner, name)
     
     # Detect default branch if not specified
     if ref is None:

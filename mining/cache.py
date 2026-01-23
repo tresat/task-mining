@@ -9,9 +9,10 @@ import json
 from typing import Dict, List, Any, Optional
 
 # Cache configuration constants
-MAX_CACHE_ITEMS = 100  # Maximum number of items to cache per repository
-PR_BATCH_SIZE = 50     # Number of PRs to fetch per batch when priming
-COMMIT_BATCH_SIZE = 100  # Number of commits to fetch per batch when priming
+MAX_CACHE_ITEMS_PRS = 100      # Maximum number of PRs to cache per repository
+MAX_CACHE_ITEMS_COMMITS = 1000  # Maximum number of commits to cache per repository
+PR_BATCH_SIZE = 50             # Number of PRs to fetch per batch when priming
+COMMIT_BATCH_SIZE = 100        # Number of commits to fetch per batch when priming
 
 
 class CacheManager:
@@ -135,7 +136,7 @@ class CacheManager:
             print(f"Cleared all caches from {cache_root}/")
 
 
-def prime_pr_cache(miner, cache_manager: CacheManager, max_items: int = MAX_CACHE_ITEMS):
+def prime_pr_cache(miner, cache_manager: CacheManager, max_items: int = MAX_CACHE_ITEMS_PRS):
     """
     Prime the PR cache by fetching recent PRs from GitHub.
     
@@ -225,7 +226,7 @@ def prime_pr_cache(miner, cache_manager: CacheManager, max_items: int = MAX_CACH
     print(f"Cache priming complete: {items_fetched} new PRs cached ({initial_size} -> {final_size})")
 
 
-def prime_commit_cache(miner, cache_manager: CacheManager, ref: str, max_items: int = MAX_CACHE_ITEMS):
+def prime_commit_cache(miner, cache_manager: CacheManager, ref: str, max_items: int = MAX_CACHE_ITEMS_COMMITS):
     """
     Prime the commit cache by fetching recent commits from GitHub.
     
@@ -248,8 +249,8 @@ def prime_commit_cache(miner, cache_manager: CacheManager, ref: str, max_items: 
         print(f"Cache already contains {initial_size} commits (>= {max_items}), skipping priming")
         return
     
-    # Import the commits query from mine_dep_update_commits
-    from .mine_dep_update_commits import COMMITS_QUERY
+    # Import the commits query from mine_commits
+    from .mine_commits import COMMITS_QUERY
     
     cursor = None
     items_fetched = 0
