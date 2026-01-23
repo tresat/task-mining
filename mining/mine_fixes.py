@@ -262,10 +262,7 @@ class GitHubMiner:
                                 "from_msg": bad_commit["message"].split('\n')[0],
                                 "to_commit": oid,
                                 "to_msg": msg,
-                                "changed_file": "",  # Not available for PR-based mining
-                                "changed_line_number": None,  # Not available for PR-based mining
-                                "from_line_contents": "",  # Not available for PR-based mining
-                                "to_line_contents": ""  # Not available for PR-based mining
+                                "files_changed": []  # Not available for PR-based mining; can be populated by classification
                             }
                             # Check for duplicates before adding
                             if not any(r['to_commit'] == oid for r in results) and not any(r['to_commit'] == oid for r in batch_results):

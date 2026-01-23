@@ -28,14 +28,22 @@ All mining scripts now use a **unified JSON format** to ensure consistency:
   "from_msg": "Initial implementation",
   "to_commit": "def456",
   "to_msg": "Fix build issue",
-  "changed_file": "build.gradle",
-  "changed_line_number": 42,
-  "from_line_contents": "version = \"1.0.0\"",
-  "to_line_contents": "version = \"1.1.0\""
+  "files_changed": [
+    {
+      "filename": "build.gradle",
+      "line_number": 42,
+      "from_line_contents": "version = \"1.0.0\"",
+      "to_line_contents": "version = \"1.1.0\""
+    }
+  ]
 }
 ```
 
-Fields not applicable to a specific mining type (e.g., `pr_id` for commit-based mining) are left empty.
+**Note:** 
+- `files_changed` is always an array, even for single-file changes
+- For PR-based mining, `files_changed` is initially empty and can be populated by classification scripts
+- For commit-based mining, `files_changed` contains detailed line-level change information
+- Fields not applicable to a specific mining type (e.g., `pr_id` for commit-based mining) are left empty or null
 
 ## Scripts
 

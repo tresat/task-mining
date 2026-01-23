@@ -476,10 +476,12 @@ class SimpleDependencyMiner:
                     "from_msg": "",  # We don't have parent message easily
                     "to_commit": oid,
                     "to_msg": msg,
-                    "changed_file": file_info.get("filename"),
-                    "changed_line_number": version_change["line_number"],
-                    "from_line_contents": version_change["from_line"],
-                    "to_line_contents": version_change["to_line"]
+                    "files_changed": [{
+                        "filename": file_info.get("filename"),
+                        "line_number": version_change["line_number"],
+                        "from_line_contents": version_change["from_line"],
+                        "to_line_contents": version_change["to_line"]
+                    }]
                 }
                 
                 # Check for duplicates before adding
