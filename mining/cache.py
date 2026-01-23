@@ -145,9 +145,9 @@ def prime_pr_cache(miner, cache_manager: CacheManager, max_items: int = MAX_CACH
     2. Reaching max_items in cache
     
     Args:
-        miner: GitHubMiner instance
+        miner: PRMiner instance
         cache_manager: CacheManager instance for PRs
-        max_items: Maximum number of items to cache (default: MAX_CACHE_ITEMS)
+        max_items: Maximum number of items to cache (default: MAX_CACHE_ITEMS_PRS)
     """
     print(f"Priming PR cache for {miner.owner}/{miner.name}...")
     
@@ -235,10 +235,10 @@ def prime_commit_cache(miner, cache_manager: CacheManager, ref: str, max_items: 
     2. Reaching max_items in cache
     
     Args:
-        miner: SimpleDependencyMiner instance
+        miner: CommitMiner instance
         cache_manager: CacheManager instance for commits
         ref: Git ref to scan
-        max_items: Maximum number of items to cache (default: MAX_CACHE_ITEMS)
+        max_items: Maximum number of items to cache (default: MAX_CACHE_ITEMS_COMMITS)
     """
     print(f"Priming commit cache for {miner.owner}/{miner.name}...")
     
