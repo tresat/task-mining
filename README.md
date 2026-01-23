@@ -30,12 +30,19 @@ This project mines GitHub repositories for "Self-Correction" pairs (Bad Commit -
 ### 1b. `mine_simple_dependency_updates.py` (The Simple Dependency Miner)
 **Function**: Identifies simple single-line dependency version updates.
 - **Logic**: Scans individual commits (not PRs) for single-line dependency version increases in `build.gradle`, `build.gradle.kts`, or `libs.versions.toml` files where both the commit and its parent have successful builds.
-- **Input**: GitHub Repo (owner/name)
-- **Output**: `results/simple_dependency_updates.json`
-- **Usage**:
+- **Branch Detection**: Automatically detects the default branch (tries `main` first, then `master`).
+- **Input**: GitHub Repo (owner/name) OR a text file with a list of repos (one per line)
+- **Output**: `results/{owner}_{name}/simple_dependency_updates.json`
+- **Usage (Single Repo)**:
   ```bash
   python3 mine_simple_dependency_updates.py android/nowinandroid --limit 1000
   ```
+- **Usage (Multi-Repo)**:
+  Create a file `repos.txt` with one repo per line, then:
+  ```bash
+  python3 mine_simple_dependency_updates.py repos.txt --limit 1000
+  ```
+  Results will be saved in `results/{owner}_{name}/simple_dependency_updates.json`.
 - **Output Format**: Similar to `mining_results.json` but with:
   - `from_commit` / `to_commit` instead of `bad_commit` / `good_commit`
   - Additional fields: `changed_file`, `changed_line_number`, `from_line_contents`, `to_line_contents`

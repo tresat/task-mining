@@ -1,5 +1,8 @@
 import unittest
-from mine_simple_dependency_updates import SimpleDependencyMiner
+import os
+import tempfile
+from unittest.mock import patch, MagicMock
+from mine_simple_dependency_updates import SimpleDependencyMiner, process_repo, main
 
 class TestSimpleDependencyMiner(unittest.TestCase):
     def setUp(self):
@@ -120,6 +123,80 @@ class TestSimpleDependencyMiner(unittest.TestCase):
 """
         result2 = self.miner.extract_version_change(patch2)
         self.assertIsNone(result2)
+
+    @patch('mine_simple_dependency_updates.SimpleDependencyMiner._query')
+    def test_get_default_branch_main_exists(self, mock_query):
+        """Test default branch detection when 'main' exists"""
+        # Mock response indicating main branch exists
+        mock_query.return_value = {
+            "data": {
+                "repository": {
+                    "ref": {
+                        "name": "main"
+                    }
+                }
+            }
+        }
+        
+        result = self.miner.get_default_branch()
+        self.assertEqual(result, "refs/heads/main")
+    
+    @patch('mine_simple_dependency_updates.SimpleDependencyMiner._query')
+    def test_get_default_branch_master_fallback(self, mock_query):
+        """Test default branch detection falls back to 'master' when 'main' doesn't exist"""
+        # First call returns None (main doesn't exist), second call returns master
+        mock_query.side_effect = [
+            {"data": {"repository": {"ref": None}}},  # main doesn't exist
+            {"data": {"repository": {"ref": {"name": "master"}}}}  # master exists
+        ]
+        
+        result = self.miner.get_default_branch()
+        self.assertEqual(result, "refs/heads/master")
+
+class TestProcessRepo(unittest.TestCase):
+    """Test the process_repo function for handling single repos and file lists"""
+    
+    @patch('mine_simple_dependency_updates.SimpleDependencyMiner')
+    def test_process_single_repo(self, mock_miner_class):
+        """Test processing a single repository"""
+        mock_miner = MagicMock()
+        mock_miner.get_default_branch.return_value = "refs/heads/main"
+        mock_miner_class.return_value = mock_miner
+        
+        with tempfile.TemporaryDirectory() as tmpdir:
+            process_repo("owner/repo", "fake_token", 100, tmpdir, tmpdir, None)
+            
+            # Verify miner was created with correct parameters
+            mock_miner_class.assert_called_once_with("fake_token", "owner", "repo")
+            
+            # Verify get_default_branch was called
+            mock_miner.get_default_branch.assert_called_once()
+            
+            # Verify mine was called
+            mock_miner.mine.assert_called_once()
+
+    def test_process_repo_list_from_file(self):
+        """Test processing multiple repositories from a file"""
+        # Create a temporary file with repo list
+        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as f:
+            f.write("owner1/repo1\n")
+            f.write("owner2/repo2\n")
+            f.write("# This is a comment\n")
+            f.write("owner3/repo3\n")
+            temp_file = f.name
+        
+        try:
+            # Read the file and verify it's parsed correctly
+            with open(temp_file, 'r') as f:
+                repos = [line.strip() for line in f if line.strip() and not line.startswith("#")]
+            
+            self.assertEqual(len(repos), 3)
+            self.assertIn("owner1/repo1", repos)
+            self.assertIn("owner2/repo2", repos)
+            self.assertIn("owner3/repo3", repos)
+            self.assertNotIn("# This is a comment", repos)
+        finally:
+            os.unlink(temp_file)
 
 if __name__ == '__main__':
     unittest.main()

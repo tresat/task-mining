@@ -138,6 +138,41 @@ class SimpleDependencyMiner:
                 time.sleep(wait_time)
         raise Exception("Max retries exceeded")
 
+    def get_default_branch(self) -> str:
+        """
+        Detect the default branch for the repository.
+        Tries 'main' first, then 'master' if main doesn't exist.
+        Returns the ref string (e.g., 'refs/heads/main').
+        """
+        for branch in ['main', 'master']:
+            ref = f'refs/heads/{branch}'
+            # Quick check with a simple query
+            test_query = """
+            query ($owner: String!, $name: String!, $ref: String!) {
+              repository(owner: $owner, name: $name) {
+                ref(qualifiedName: $ref) {
+                  name
+                }
+              }
+            }
+            """
+            variables = {
+                "owner": self.owner,
+                "name": self.name,
+                "ref": ref
+            }
+            try:
+                data = self._query(test_query, variables)
+                if data.get("data", {}).get("repository", {}).get("ref"):
+                    print(f"Using branch: {branch}")
+                    return ref
+            except Exception:
+                continue
+        
+        # Default to main if detection fails
+        print("Could not detect default branch, defaulting to 'main'")
+        return "refs/heads/main"
+
     def is_build_successful(self, commit_data: Dict[str, Any]) -> bool:
         """
         Determines if a commit build was successful.
@@ -481,16 +516,45 @@ class SimpleDependencyMiner:
                 
         return results
 
+def process_repo(repo: str, token: str, limit: int, output_dir: str, state_dir: str, ref: Optional[str] = None):
+    """Process a single repository."""
+    print(f"\n{'#'*60}")
+    print(f"PROCESSING REPO: {repo}")
+    print(f"{'#'*60}\n")
+    
+    if "/" not in repo:
+        print(f"Skipping invalid repo format: {repo}")
+        return
+        
+    owner, name = repo.split("/", 1)
+    
+    # Create repo-specific output directory
+    repo_output_dir = os.path.join(output_dir, f"{owner}_{name}")
+    os.makedirs(repo_output_dir, exist_ok=True)
+    
+    output_file = os.path.join(repo_output_dir, "simple_dependency_updates.json")
+    state_file = os.path.join(state_dir, f"{owner}_{name}_simple_dependency_state.json")
+    
+    miner = SimpleDependencyMiner(token, owner, name)
+    
+    # Detect default branch if not specified
+    if ref is None:
+        ref = miner.get_default_branch()
+    
+    print(f"Mining {repo} for up to {limit} commits...")
+    miner.mine(limit, output_file, state_file, ref)
+    print(f"Mining complete for {repo}.")
+
 def main():
     load_env()
     
     parser = argparse.ArgumentParser(description="Mine Simple Dependency Updates from GitHub")
-    parser.add_argument("repo", help="GitHub repository in 'owner/name' format")
+    parser.add_argument("repo_or_file", help="GitHub repository in 'owner/name' format OR path to a text file with a list of repos")
     parser.add_argument("--token", help="GitHub PAT (optional if GITHUB_TOKEN env var is set)")
     parser.add_argument("--limit", type=int, default=1000, help="Number of commits to scan")
-    parser.add_argument("--output", default="results/simple_dependency_updates.json", help="Output JSON file")
-    parser.add_argument("--state", default="simple_dependency_state.json", help="State file for resumability")
-    parser.add_argument("--ref", default="refs/heads/main", help="Git ref to scan (default: refs/heads/main)")
+    parser.add_argument("--output", default="results", help="Output directory for results")
+    parser.add_argument("--state", default=".", help="Directory for state files")
+    parser.add_argument("--ref", default=None, help="Git ref to scan (e.g., refs/heads/main). If not specified, auto-detects main or master")
     
     args = parser.parse_args()
     
@@ -499,17 +563,22 @@ def main():
         print("Error: No GitHub token provided. Set GITHUB_TOKEN or use --token.")
         return
 
-    if "/" not in args.repo:
-        print("Error: Repo must be in 'owner/name' format.")
-        return
-        
-    owner, name = args.repo.split("/", 1)
+    repos = []
+    if os.path.isfile(args.repo_or_file):
+        with open(args.repo_or_file, 'r') as f:
+            repos = [line.strip() for line in f if line.strip() and not line.startswith("#")]
+        print(f"Loaded {len(repos)} repositories from {args.repo_or_file}")
+    else:
+        repos = [args.repo_or_file]
     
-    miner = SimpleDependencyMiner(token, owner, name)
-    print(f"Mining {args.repo} for up to {args.limit} commits...")
+    for repo in repos:
+        try:
+            process_repo(repo, token, args.limit, args.output, args.state, args.ref)
+        except Exception as e:
+            print(f"Failed to process {repo}: {e}")
+            # Continue to next repo
     
-    miner.mine(args.limit, args.output, args.state, args.ref)
-    print("Mining complete.")
+    print("\nAll mining complete!")
 
 if __name__ == "__main__":
     main()
