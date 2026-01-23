@@ -15,7 +15,7 @@ def run_step(command, description):
         print(f"Error during '{description}': {e}")
         sys.exit(1)
 
-def process_repo(repo, limit, mining_type, classifier):
+def process_repo(repo, search_limit, results_limit, mining_type, classifier):
     print(f"\n{'#'*60}")
     print(f"PROCESSING REPO: {repo}")
     print(f"{'#'*60}\n")
@@ -38,10 +38,17 @@ def process_repo(repo, limit, mining_type, classifier):
     analyzed_output = os.path.join(output_dir, "analyzed_results.json")
     ai_output = os.path.join(output_dir, "ai_classified_results.json")
     
+    # Build limit arguments
+    limit_args = []
+    if search_limit:
+        limit_args.extend(["--search-limit", str(search_limit)])
+    if results_limit:
+        limit_args.extend(["--results-limit", str(results_limit)])
+    
     # Step 1: Mine based on type
     if mining_type == "fixes":
         run_step(
-            ["python3", "-m", "mining.mine_fixes", repo, "--limit", str(limit), "--output", "results", "--state", state_dir],
+            ["python3", "-m", "mining.mine_fixes", repo] + limit_args + ["--output", "results", "--state", state_dir],
             f"Mining 'Bad -> Good' Pairs for {repo}"
         )
         
@@ -66,17 +73,17 @@ def process_repo(repo, limit, mining_type, classifier):
             )
     elif mining_type == "simple-dep-updates":
         run_step(
-            ["python3", "-m", "mining.mine_simple_dependency_updates", repo, "--limit", str(limit), "--output", "results", "--state", state_dir],
+            ["python3", "-m", "mining.mine_simple_dependency_updates", repo] + limit_args + ["--output", "results", "--state", state_dir],
             f"Mining Simple Dependency Updates for {repo}"
         )
     elif mining_type == "both":
         # Run both mining types
         run_step(
-            ["python3", "-m", "mining.mine_fixes", repo, "--limit", str(limit), "--output", "results", "--state", state_dir],
+            ["python3", "-m", "mining.mine_fixes", repo] + limit_args + ["--output", "results", "--state", state_dir],
             f"Mining 'Bad -> Good' Pairs for {repo}"
         )
         run_step(
-            ["python3", "-m", "mining.mine_simple_dependency_updates", repo, "--limit", str(limit), "--output", "results", "--state", state_dir],
+            ["python3", "-m", "mining.mine_simple_dependency_updates", repo] + limit_args + ["--output", "results", "--state", state_dir],
             f"Mining Simple Dependency Updates for {repo}"
         )
         
@@ -102,7 +109,8 @@ def process_repo(repo, limit, mining_type, classifier):
 def main():
     parser = argparse.ArgumentParser(description="Run the full Task Mining Pipeline")
     parser.add_argument("repo_or_file", help="GitHub repository (owner/name) OR path to a text file with a list of repos")
-    parser.add_argument("--limit", type=int, default=100, help="Limit for mining PRs per repo")
+    parser.add_argument("--search-limit", type=int, help="Maximum number of PRs/commits to search through (stops after searching this many items)")
+    parser.add_argument("--results-limit", type=int, help="Maximum number of valid results to find (stops after finding this many valid pairs)")
     parser.add_argument("--clean", action="store_true", help="Clean previous results/state before running (deletes entire results/ and state/ directories)")
     parser.add_argument("--type", default="fixes", choices=["fixes", "simple-dep-updates", "both"],
                        help="Type of mining to run: 'fixes' (PR-based bad->good), 'simple-dep-updates' (single-line dependency updates), or 'both' (default: fixes)")
@@ -110,6 +118,10 @@ def main():
                        help="Classification to run: 'simple' (heuristic), 'ai' (Gemini), or 'both' (default: both). Only applies to 'fixes' mining type.")
     
     args = parser.parse_args()
+    
+    # Validate that at least one limit is specified
+    if not args.search_limit and not args.results_limit:
+        parser.error("At least one of --search-limit or --results-limit must be specified")
     
     # Clean entire results and state directories if requested (done first, before processing any repos)
     if args.clean:
@@ -139,7 +151,7 @@ def main():
         
     for repo in repos:
         try:
-            process_repo(repo, args.limit, args.type, args.classifier)
+            process_repo(repo, args.search_limit, args.results_limit, args.type, args.classifier)
         except Exception as e:
             print(f"Failed to process {repo}: {e}")
             # Continue to next repo

@@ -53,6 +53,11 @@ All mining scripts now use a **unified JSON format** to ensure consistency:
   - `fixes` (default): PR-based bad->good commit pairs
   - `simple-dep-updates`: Single-line dependency updates only
   - `both`: Runs both mining types
+- **Limit Options**:
+  - `--search-limit`: Maximum number of PRs/commits to search through (stops after searching this many items)
+  - `--results-limit`: Maximum number of valid results to find (stops after finding this many valid pairs/updates)
+  - At least one limit must be specified
+  - Both limits can be used together
 - **Classification Options** (`--classifier`): Only applies to `fixes` mining type
   - `simple`: Heuristic classification only (fast)
   - `ai`: AI classification with Gemini (requires simple as prerequisite)
@@ -63,22 +68,28 @@ All mining scripts now use a **unified JSON format** to ensure consistency:
   - Executes before any mining or classification begins
 - **Usage (Single Repo)**:
   ```bash
-  # Run fixes mining with both classifiers
-  python3 run_pipeline.py android/nowinandroid --limit 100 --type fixes --classifier both
+  # Search through 100 PRs
+  python3 run_pipeline.py android/nowinandroid --search-limit 100 --type fixes
+  
+  # Find 50 valid pairs
+  python3 run_pipeline.py android/nowinandroid --results-limit 50 --type fixes
+  
+  # Search through 200 PRs or until 50 valid pairs found (whichever comes first)
+  python3 run_pipeline.py android/nowinandroid --search-limit 200 --results-limit 50 --type fixes
   
   # Run with clean (deletes all previous results first)
-  python3 run_pipeline.py android/nowinandroid --limit 100 --type fixes --clean
+  python3 run_pipeline.py android/nowinandroid --search-limit 100 --type fixes --clean
   
   # Run only simple classification
-  python3 run_pipeline.py android/nowinandroid --limit 100 --type fixes --classifier simple
+  python3 run_pipeline.py android/nowinandroid --search-limit 100 --type fixes --classifier simple
   
   # Run simple-dep-updates mining (no classification)
-  python3 run_pipeline.py android/nowinandroid --limit 1000 --type simple-dep-updates
+  python3 run_pipeline.py android/nowinandroid --results-limit 100 --type simple-dep-updates
   ```
 - **Usage (Multi-Repo)**:
   Create a file `repos.txt` with one repo per line, then:
   ```bash
-  python3 run_pipeline.py repos.txt --limit 100 --type both --clean
+  python3 run_pipeline.py repos.txt --search-limit 100 --type both --clean
   ```
   Results will be saved in `results/{owner}_{name}/`, state files in `state/`.
 

@@ -381,8 +381,17 @@ class SimpleDependencyMiner:
         with open(state_file, 'w') as f:
             json.dump({"cursor": cursor}, f)
 
-    def mine(self, limit: int, output_file: str, state_file: str, ref: str = "refs/heads/main") -> List[Dict[str, Any]]:
-        """Mines the repository for simple dependency update commits with resumability."""
+    def mine(self, search_limit: Optional[int], results_limit: Optional[int], output_file: str, state_file: str, ref: str = "refs/heads/main") -> List[Dict[str, Any]]:
+        """
+        Mines the repository for simple dependency update commits with resumability.
+        
+        Args:
+            search_limit: Maximum number of commits to search through (None for unlimited)
+            results_limit: Maximum number of valid updates to find (None for unlimited)
+            output_file: Path to output JSON file
+            state_file: Path to state file for resumability
+            ref: Git ref to scan
+        """
         results = []
         
         # Create results directory if it doesn't exist
@@ -405,8 +414,24 @@ class SimpleDependencyMiner:
             
         processed_count = 0
         
-        while processed_count < limit:
-            batch_size = min(100, limit - processed_count)
+        # Continue until we hit either limit (if specified)
+        while True:
+            # Check results limit
+            if results_limit and len(results) >= results_limit:
+                print(f"Reached results limit of {results_limit} updates.")
+                break
+            
+            # Check search limit
+            if search_limit and processed_count >= search_limit:
+                print(f"Reached search limit of {search_limit} commits.")
+                break
+            
+            # Determine batch size
+            if search_limit:
+                batch_size = min(100, search_limit - processed_count)
+            else:
+                batch_size = 100
+                
             variables = {
                 "owner": self.owner,
                 "name": self.name,
@@ -506,7 +531,7 @@ class SimpleDependencyMiner:
                 
         return results
 
-def process_repo(repo: str, token: str, limit: int, output_dir: str, state_dir: str, ref: Optional[str] = None):
+def process_repo(repo: str, token: str, search_limit: Optional[int], results_limit: Optional[int], output_dir: str, state_dir: str, ref: Optional[str] = None):
     """Process a single repository."""
     print(f"\n{'#'*60}")
     print(f"PROCESSING REPO: {repo}")
@@ -534,8 +559,14 @@ def process_repo(repo: str, token: str, limit: int, output_dir: str, state_dir: 
     if ref is None:
         ref = miner.get_default_branch()
     
-    print(f"Mining {repo} for up to {limit} commits...")
-    miner.mine(limit, output_file, state_file, ref)
+    limit_desc = []
+    if search_limit:
+        limit_desc.append(f"search limit: {search_limit} commits")
+    if results_limit:
+        limit_desc.append(f"results limit: {results_limit} updates")
+    print(f"Mining {repo} ({', '.join(limit_desc) if limit_desc else 'no limits'})...")
+    
+    miner.mine(search_limit, results_limit, output_file, state_file, ref)
     print(f"Mining complete for {repo}.")
 
 def main():
@@ -544,12 +575,17 @@ def main():
     parser = argparse.ArgumentParser(description="Mine Simple Dependency Updates from GitHub")
     parser.add_argument("repo_or_file", help="GitHub repository in 'owner/name' format OR path to a text file with a list of repos")
     parser.add_argument("--token", help="GitHub PAT (optional if GITHUB_TOKEN env var is set)")
-    parser.add_argument("--limit", type=int, default=1000, help="Number of commits to scan")
+    parser.add_argument("--search-limit", type=int, help="Maximum number of commits to search through")
+    parser.add_argument("--results-limit", type=int, help="Maximum number of valid updates to find")
     parser.add_argument("--output", default="results", help="Output directory for results")
     parser.add_argument("--state", default="state", help="Directory for state files (default: state)")
     parser.add_argument("--ref", default=None, help="Git ref to scan (e.g., refs/heads/main). If not specified, auto-detects main or master")
     
     args = parser.parse_args()
+    
+    # Validate that at least one limit is specified
+    if not args.search_limit and not args.results_limit:
+        parser.error("At least one of --search-limit or --results-limit must be specified")
     
     token = args.token or os.environ.get("GITHUB_TOKEN")
     if not token:
@@ -560,7 +596,7 @@ def main():
     
     for repo in repos:
         try:
-            process_repo(repo, token, args.limit, args.output, args.state, args.ref)
+            process_repo(repo, token, args.search_limit, args.results_limit, args.output, args.state, args.ref)
         except Exception as e:
             print(f"Failed to process {repo}: {e}")
             # Continue to next repo
