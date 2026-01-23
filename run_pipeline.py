@@ -28,7 +28,7 @@ def run_step(command, description, show_header=True):
         print(f"\n{'='*60}")
         print(f"STEP: {description}")
         print(f"CMD: {' '.join(command)}")
-        print(f"{'='*60}\n")
+        print(f"{'='*60}")
     
     try:
         subprocess.run(command, check=True)
@@ -55,7 +55,7 @@ def prime_cache_for_repo(repo, mining_type):
         print("Error: GITHUB_TOKEN not found")
         return
     
-    print(f"\n*** CACHE PRIMING: {repo} ***\n")
+    print(f"\n*** CACHE PRIMING: {repo} ***")
     
     if mining_type == "fixes":
         from mining.mine_prs import GitHubMiner
@@ -77,8 +77,6 @@ def prime_cache_for_repo(repo, mining_type):
         ref = miner.get_default_branch()
         
         prime_commit_cache(miner, cache_manager, ref, max_items=MAX_CACHE_ITEMS)
-    
-    print(f"Cache priming complete for {repo}\n")
 
 
 def run_mining(repo, search_limit, results_limit, mining_type, output_dir, state_dir):
@@ -158,7 +156,7 @@ def run_classification(repo, classifier, classification_input):
         )
 
 def process_repo(repo, search_limit, results_limit, mining_type, classifier, timeout_seconds):
-    print(f"\n*** PROCESSING REPO: {repo} ***\n")
+    print(f"\n*** PROCESSING REPO: {repo} ***")
     
     if "/" not in repo:
         print(f"Skipping invalid repo format: {repo}")
@@ -252,7 +250,7 @@ def validate_tokens(classifier):
             print("GEMINI_API_KEY=your_gemini_api_key_here")
         sys.exit(1)
     
-    print("\n✓ All required tokens are set\n")
+    print("\n✓ All required tokens are set")
 
 def main():
     parser = argparse.ArgumentParser(description="Run the full Task Mining Pipeline")
@@ -275,7 +273,7 @@ def main():
     
     print(f"\n{'='*60}")
     print("INITIALIZATION")
-    print(f"{'='*60}\n")
+    print(f"{'='*60}")
     
     # Step 0: Load environment variables and validate tokens
     load_env()
@@ -302,7 +300,7 @@ def main():
             shutil.rmtree(state_dir)
             print(f"Removed {state_dir}/")
         
-        print("Clean complete.\n")
+        print("Clean complete.")
     
     repos = []
     if os.path.isfile(args.repo_or_file):
@@ -313,9 +311,7 @@ def main():
         repos = [args.repo_or_file]
     
     repo_word = "repository" if len(repos) == 1 else "repositories"
-    print(f"Processing {len(repos)} {repo_word} with {args.timeout} second timeout per repo\n")
-    
-    print(f"{'='*60}\n")
+    print(f"Processing {len(repos)} {repo_word} with {args.timeout} second timeout per repo")
     
     # Prime cache for all repos first (with timeout protection)
     for repo in repos:
@@ -325,7 +321,7 @@ def main():
         except TimeoutError as e:
             print(f"\n{'!'*60}")
             print(f"TIMEOUT during cache priming: {e}")
-            print(f"{'!'*60}\n")
+            print(f"{'!'*60}")
             print(f"Skipping cache priming for {repo}, will fetch from GitHub during mining...")
         except Exception as e:
             print(f"Failed to prime cache for {repo}: {e}")
@@ -333,7 +329,7 @@ def main():
     
     print(f"\n{'='*60}")
     print("PROCESSING REPOSITORIES")
-    print(f"{'='*60}\n")
+    print(f"{'='*60}")
     
     for repo in repos:
         try:
@@ -342,7 +338,7 @@ def main():
         except TimeoutError as e:
             print(f"\n{'!'*60}")
             print(f"TIMEOUT: {e}")
-            print(f"{'!'*60}\n")
+            print(f"{'!'*60}")
             print(f"Skipping {repo} and continuing to next repository...")
             # Continue to next repo
         except Exception as e:
@@ -351,7 +347,7 @@ def main():
     
     print(f"\n{'='*60}")
     print("GENERATING REPORT")
-    print(f"{'='*60}\n")
+    print(f"{'='*60}")
     
     # Step 3: Aggregate all results into a single file
     aggregate_results()
@@ -360,7 +356,7 @@ def main():
     from reporting.build_dashboard import build_dashboard
     build_dashboard()
     
-    print(f"\n{'='*60}\n")
+    print(f"\n{'='*60}")
             
     print("\nPipeline Complete!")
 
