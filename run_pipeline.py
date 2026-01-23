@@ -357,8 +357,8 @@ def main():
     build_dashboard()
     
     print(f"\n{'='*60}")
-            
-    print("\nPipeline Complete!")
+    print("FINISHED!")
+    print(f"{'='*60}")
 
 
 if __name__ == "__main__":

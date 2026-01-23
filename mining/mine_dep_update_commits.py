@@ -573,7 +573,8 @@ class SimpleDependencyMiner:
                 for commit in nodes:
                     oid = commit["oid"]
                     cache_manager.set(oid, commit)
-                print(f"Added {len(nodes)} commits to cache")
+                total_cache_size = cache_manager.size()
+                print(f"Added {len(nodes)} commits to cache (total: {total_cache_size})")
             
             # Now process commits FROM CACHE
             for commit in nodes:
@@ -734,7 +735,7 @@ def main():
             print(f"Failed to process {repo}: {e}")
             # Continue to next repo
     
-    print("\nAll mining complete!")
+
 
 if __name__ == "__main__":
     main()

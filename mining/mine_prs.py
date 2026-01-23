@@ -344,7 +344,8 @@ class GitHubMiner:
                     pr_data = pr.copy()
                     pr_data["commits"]["nodes"] = commits
                     cache_manager.set(str(pr_number), pr_data)
-                print(f"Added {len(nodes)} PRs to cache")
+                total_cache_size = cache_manager.size()
+                print(f"Added {len(nodes)} PRs to cache (total: {total_cache_size})")
             
             # Now process PRs FROM CACHE
             for pr in nodes:
@@ -483,7 +484,7 @@ def main():
             print(f"Failed to process {repo}: {e}")
             # Continue to next repo
     
-    print("\nAll mining complete!")
+
 
 if __name__ == "__main__":
     main()
