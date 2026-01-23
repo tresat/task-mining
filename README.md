@@ -48,14 +48,25 @@ All mining scripts now use a **unified JSON format** to ensure consistency:
 ## Scripts
 
 ### 0. `run_pipeline.py` (The All-in-One)
-**Function**: Runs the entire pipeline (Mining -> Analysis -> AI).
-- **Mining Types**: Supports different mining modes via `--type` parameter:
-  - `fixes` (default): PR-based bad->good commit pairs + analysis + AI classification
+**Function**: Runs the entire pipeline (Mining -> Classification).
+- **Mining Types** (`--type`): 
+  - `fixes` (default): PR-based bad->good commit pairs
   - `simple-dep-updates`: Single-line dependency updates only
   - `both`: Runs both mining types
+- **Classification Options** (`--classifier`): Only applies to `fixes` mining type
+  - `simple`: Heuristic classification only (fast)
+  - `ai`: AI classification with Gemini (requires simple as prerequisite)
+  - `both` (default): Runs both simple and AI classification
 - **Usage (Single Repo)**:
   ```bash
-  python3 run_pipeline.py android/nowinandroid --limit 100 --type fixes
+  # Run fixes mining with both classifiers
+  python3 run_pipeline.py android/nowinandroid --limit 100 --type fixes --classifier both
+  
+  # Run only simple classification
+  python3 run_pipeline.py android/nowinandroid --limit 100 --type fixes --classifier simple
+  
+  # Run simple-dep-updates mining (no classification)
+  python3 run_pipeline.py android/nowinandroid --limit 1000 --type simple-dep-updates
   ```
 - **Usage (Multi-Repo)**:
   Create a file `repos.txt` with one repo per line, then:
@@ -97,7 +108,7 @@ All mining scripts now use a **unified JSON format** to ensure consistency:
   ```
   Results will be saved in `results/{owner}_{name}/simple_dependency_updates.json`.
 
-### 2. `classification/analyze_pairs.py` (The Heuristic Classifier)
+### 2. `classification/analyze_pairs.py` (The Simple/Heuristic Classifier)
 **Function**: Classifies pairs based on changed files (Fast & Cheap).
 - **Logic**: Checks if `build.gradle`, `libs.versions.toml`, or other build files were modified.
 - **Categories**: `Dependency Update` vs `Other`.
@@ -108,7 +119,7 @@ All mining scripts now use a **unified JSON format** to ensure consistency:
   python3 -m classification.analyze_pairs android/nowinandroid
   ```
 
-### 3. `classification/gemini_classifier.py` (The AI Classifier)
+### 2b. `classification/gemini_classifier.py` (The AI Classifier)
 **Function**: Classifies pairs using an LLM (Gemini) for deeper understanding.
 - **Logic**: Fetches the actual code diff and asks Gemini: "Is this a dependency update?".
 - **Benefit**: Can distinguish between a simple version bump and a logic fix in a build file.
