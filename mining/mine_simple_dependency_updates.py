@@ -5,6 +5,7 @@ import argparse
 import requests
 import re
 from typing import List, Dict, Optional, Any
+from .common import load_env, ensure_directory, process_repo_list
 
 # GraphQL Query to fetch commits (not PRs)
 COMMITS_QUERY = """
@@ -62,19 +63,6 @@ query ($owner: String!, $name: String!, $oid: String!) {
   }
 }
 """
-
-def load_env():
-    """Simple .env loader to avoid external dependencies."""
-    env_path = os.path.join(os.path.dirname(__file__), '.env')
-    if os.path.exists(env_path):
-        with open(env_path, 'r') as f:
-            for line in f:
-                line = line.strip()
-                if not line or line.startswith('#'):
-                    continue
-                if '=' in line:
-                    key, value = line.split('=', 1)
-                    os.environ[key.strip()] = value.strip()
 
 class SimpleDependencyMiner:
     def __init__(self, token: str, repo_owner: str, repo_name: str):
@@ -530,10 +518,10 @@ def process_repo(repo: str, token: str, limit: int, output_dir: str, state_dir: 
     
     # Create repo-specific output directory
     repo_output_dir = os.path.join(output_dir, f"{owner}_{name}")
-    os.makedirs(repo_output_dir, exist_ok=True)
+    ensure_directory(repo_output_dir)
     
     # Create state directory if it doesn't exist
-    os.makedirs(state_dir, exist_ok=True)
+    ensure_directory(state_dir)
     
     output_file = os.path.join(repo_output_dir, "simple_dependency_updates.json")
     state_file = os.path.join(state_dir, f"{owner}_{name}_simple_dependency_state.json")
@@ -566,17 +554,7 @@ def main():
         print("Error: No GitHub token provided. Set GITHUB_TOKEN or use --token.")
         return
 
-    repos = []
-    if os.path.isfile(args.repo_or_file):
-        try:
-            with open(args.repo_or_file, 'r') as f:
-                repos = [line.strip() for line in f if line.strip() and not line.startswith("#")]
-            print(f"Loaded {len(repos)} repositories from {args.repo_or_file}")
-        except (IOError, PermissionError, FileNotFoundError) as e:
-            print(f"Error reading file {args.repo_or_file}: {e}")
-            return
-    else:
-        repos = [args.repo_or_file]
+    repos = process_repo_list(args.repo_or_file)
     
     for repo in repos:
         try:

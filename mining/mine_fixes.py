@@ -4,6 +4,7 @@ import time
 import argparse
 import requests
 from typing import List, Dict, Optional, Generator, Any
+from .common import load_env, ensure_directory, process_repo_list
 
 # GraphQL Queries
 PR_QUERY = """
@@ -70,19 +71,6 @@ query ($owner: String!, $name: String!, $pr_number: Int!, $cursor: String) {
   }
 }
 """
-
-def load_env():
-    """Simple .env loader to avoid external dependencies."""
-    env_path = os.path.join(os.path.dirname(__file__), '.env')
-    if os.path.exists(env_path):
-        with open(env_path, 'r') as f:
-            for line in f:
-                line = line.strip()
-                if not line or line.startswith('#'):
-                    continue
-                if '=' in line:
-                    key, value = line.split('=', 1)
-                    os.environ[key.strip()] = value.strip()
 
 class GitHubMiner:
     def __init__(self, token: str, repo_owner: str, repo_name: str):
@@ -299,15 +287,42 @@ class GitHubMiner:
                 
         return results
 
+def process_repo(repo: str, token: str, limit: int, output_dir: str, state_dir: str):
+    """Process a single repository."""
+    print(f"\n{'#'*60}")
+    print(f"PROCESSING REPO: {repo}")
+    print(f"{'#'*60}\n")
+    
+    if "/" not in repo:
+        print(f"Skipping invalid repo format: {repo}")
+        return
+        
+    owner, name = repo.split("/", 1)
+    
+    # Create repo-specific output directory
+    repo_output_dir = os.path.join(output_dir, f"{owner}_{name}")
+    ensure_directory(repo_output_dir)
+    
+    # Create state directory if it doesn't exist
+    ensure_directory(state_dir)
+    
+    output_file = os.path.join(repo_output_dir, "mining_results.json")
+    state_file = os.path.join(state_dir, f"{owner}_{name}_mining_state.json")
+    
+    miner = GitHubMiner(token, owner, name)
+    print(f"Mining {repo} for up to {limit} PRs...")
+    miner.mine(limit, output_file, state_file)
+    print(f"Mining complete for {repo}.")
+
 def main():
     load_env()
     
     parser = argparse.ArgumentParser(description="Mine Self-Correction Pairs from GitHub")
-    parser.add_argument("repo", help="GitHub repository in 'owner/name' format")
+    parser.add_argument("repo_or_file", help="GitHub repository in 'owner/name' format OR path to a text file with a list of repos")
     parser.add_argument("--token", help="GitHub PAT (optional if GITHUB_TOKEN env var is set)")
     parser.add_argument("--limit", type=int, default=100, help="Number of PRs to scan")
-    parser.add_argument("--output", default="mining_results.json", help="Output JSON file")
-    parser.add_argument("--state", default="mining_state.json", help="State file for resumability")
+    parser.add_argument("--output", default="results", help="Output directory for results")
+    parser.add_argument("--state", default="state", help="Directory for state files (default: state)")
     
     args = parser.parse_args()
     
@@ -316,17 +331,16 @@ def main():
         print("Error: No GitHub token provided. Set GITHUB_TOKEN or use --token.")
         return
 
-    if "/" not in args.repo:
-        print("Error: Repo must be in 'owner/name' format.")
-        return
-        
-    owner, name = args.repo.split("/", 1)
+    repos = process_repo_list(args.repo_or_file)
     
-    miner = GitHubMiner(token, owner, name)
-    print(f"Mining {args.repo} for up to {args.limit} PRs...")
+    for repo in repos:
+        try:
+            process_repo(repo, token, args.limit, args.output, args.state)
+        except Exception as e:
+            print(f"Failed to process {repo}: {e}")
+            # Continue to next repo
     
-    miner.mine(args.limit, args.output, args.state)
-    print("Mining complete.")
+    print("\nAll mining complete!")
 
 if __name__ == "__main__":
     main()

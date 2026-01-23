@@ -2,45 +2,65 @@
 
 This project mines GitHub repositories for "Self-Correction" pairs (Bad Commit -> Good Commit) in merged Pull Requests. It specifically looks for build failures followed by fixes.
 
+## Project Structure
+
+- `/mining` - Mining scripts for extracting data from repositories
+  - `mine_fixes.py` - Mines PR-based bad->good commit pairs
+  - `mine_simple_dependency_updates.py` - Mines single-line dependency updates
+  - `common.py` - Shared utilities for mining scripts
+- `/test` - Unit tests for mining scripts
+- `/state` - State files for resumable mining (gitignored)
+- `/results` - Mining results (gitignored)
+
 ## Scripts
 
 ### 0. `run_pipeline.py` (The All-in-One)
 **Function**: Runs the entire pipeline (Mining -> Analysis -> AI).
+- **Mining Types**: Supports different mining modes via `--type` parameter:
+  - `fixes` (default): PR-based bad->good commit pairs + analysis + AI classification
+  - `simple`: Single-line dependency updates only
+  - `both`: Runs both mining types
 - **Usage (Single Repo)**:
   ```bash
-  python3 run_pipeline.py android/nowinandroid --limit 100
+  python3 run_pipeline.py android/nowinandroid --limit 100 --type fixes
   ```
 - **Usage (Multi-Repo)**:
   Create a file `repos.txt` with one repo per line, then:
   ```bash
-  python3 run_pipeline.py repos.txt --limit 100
+  python3 run_pipeline.py repos.txt --limit 100 --type both
   ```
-  Results will be saved in `results/{owner}_{name}/`.
+  Results will be saved in `results/{owner}_{name}/`, state files in `state/`.
 
-### 1. `mine_fixes.py` (The Miner)
+### 1. `mining/mine_fixes.py` (The Fixes Miner)
 **Function**: Identifies "Self-Correction" pairs in merged PRs.
 - **Logic**: Scans PRs for a sequence of `Failure -> Success` commits.
-- **Input**: GitHub Repo (owner/name)
-- **Output**: `mining_results.json`
-- **Usage**:
+- **Input**: GitHub Repo (owner/name) OR a text file with a list of repos (one per line)
+- **Output**: `results/{owner}_{name}/mining_results.json`
+- **State Files**: Stored in `state/{owner}_{name}_mining_state.json`
+- **Usage (Single Repo)**:
   ```bash
-  python3 mine_fixes.py android/nowinandroid --limit 100
+  python3 -m mining.mine_fixes android/nowinandroid --limit 100
+  ```
+- **Usage (Multi-Repo)**:
+  ```bash
+  python3 -m mining.mine_fixes repos.txt --limit 100
   ```
 
-### 1b. `mine_simple_dependency_updates.py` (The Simple Dependency Miner)
+### 1b. `mining/mine_simple_dependency_updates.py` (The Simple Dependency Miner)
 **Function**: Identifies simple single-line dependency version updates.
 - **Logic**: Scans individual commits (not PRs) for single-line dependency version increases in `build.gradle`, `build.gradle.kts`, or `libs.versions.toml` files where both the commit and its parent have successful builds.
 - **Branch Detection**: Automatically detects the default branch (tries `main` first, then `master`).
 - **Input**: GitHub Repo (owner/name) OR a text file with a list of repos (one per line)
 - **Output**: `results/{owner}_{name}/simple_dependency_updates.json`
+- **State Files**: Stored in `state/{owner}_{name}_simple_dependency_state.json`
 - **Usage (Single Repo)**:
   ```bash
-  python3 mine_simple_dependency_updates.py android/nowinandroid --limit 1000
+  python3 -m mining.mine_simple_dependency_updates android/nowinandroid --limit 1000
   ```
 - **Usage (Multi-Repo)**:
   Create a file `repos.txt` with one repo per line, then:
   ```bash
-  python3 mine_simple_dependency_updates.py repos.txt --limit 1000
+  python3 -m mining.mine_simple_dependency_updates repos.txt --limit 1000
   ```
   Results will be saved in `results/{owner}_{name}/simple_dependency_updates.json`.
 - **Output Format**: Similar to `mining_results.json` but with:
@@ -70,13 +90,13 @@ This project mines GitHub repositories for "Self-Correction" pairs (Bad Commit -
   ```
 
 ## Resumability
-Multiple scripts support resuming if interrupted.
+All mining scripts support resuming if interrupted.
 
-- **mine_fixes.py**: Uses a state file (default `mining_state.json`) to save the cursor.
+- **mining/mine_fixes.py**: Uses state files in the `state/` directory (e.g., `state/{owner}_{name}_mining_state.json`).
   - To resume: Just run the same command again.
-  - To restart: Delete `mining_state.json` and `mining_results.json`.
+  - To restart: Delete the corresponding state file in `state/` and the results in `results/{owner}_{name}/mining_results.json`.
 
-- **mine_simple_dependency_updates.py**: Uses state files in the `state/` directory (e.g., `state/{owner}_{name}_simple_dependency_state.json`).
+- **mining/mine_simple_dependency_updates.py**: Uses state files in the `state/` directory (e.g., `state/{owner}_{name}_simple_dependency_state.json`).
   - To resume: Just run the same command again.
   - To restart: Delete the corresponding state file in `state/` and the results in `results/{owner}_{name}/simple_dependency_updates.json`.
 
