@@ -7,7 +7,7 @@ from unittest.mock import patch, MagicMock
 # Add parent directory to path to allow importing mining package
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from mining.mine_simple_dependency_updates import SimpleDependencyMiner, process_repo, main
+from mining.mine_dep_update_commits import SimpleDependencyMiner, process_repo, main
 
 class TestSimpleDependencyMiner(unittest.TestCase):
     def setUp(self):
@@ -129,7 +129,7 @@ class TestSimpleDependencyMiner(unittest.TestCase):
         result2 = self.miner.extract_version_change(patch2)
         self.assertIsNone(result2)
 
-    @patch('mining.mine_simple_dependency_updates.SimpleDependencyMiner._query')
+    @patch('mining.mine_dep_update_commits.SimpleDependencyMiner._query')
     def test_get_default_branch_main_exists(self, mock_query):
         """Test default branch detection when 'main' exists"""
         # Mock response indicating main branch exists
@@ -146,7 +146,7 @@ class TestSimpleDependencyMiner(unittest.TestCase):
         result = self.miner.get_default_branch()
         self.assertEqual(result, "refs/heads/main")
     
-    @patch('mining.mine_simple_dependency_updates.SimpleDependencyMiner._query')
+    @patch('mining.mine_dep_update_commits.SimpleDependencyMiner._query')
     def test_get_default_branch_master_fallback(self, mock_query):
         """Test default branch detection falls back to 'master' when 'main' doesn't exist"""
         # First call returns None (main doesn't exist), second call returns master
@@ -161,7 +161,7 @@ class TestSimpleDependencyMiner(unittest.TestCase):
 class TestProcessRepo(unittest.TestCase):
     """Test the process_repo function for handling single repos and file lists"""
     
-    @patch('mining.mine_simple_dependency_updates.SimpleDependencyMiner')
+    @patch('mining.mine_dep_update_commits.SimpleDependencyMiner')
     def test_process_single_repo(self, mock_miner_class):
         """Test processing a single repository"""
         mock_miner = MagicMock()

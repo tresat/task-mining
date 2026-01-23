@@ -157,8 +157,8 @@ def prime_pr_cache(miner, cache_manager: CacheManager, max_items: int = MAX_CACH
         print(f"Cache already contains {initial_size} PRs (>= {max_items}), skipping priming")
         return
     
-    # Import the PR query from mine_fixes
-    from .mine_fixes import PR_QUERY
+    # Import the PR query from mine_prs
+    from .mine_prs import PR_QUERY
     
     cursor = None
     items_fetched = 0
@@ -248,8 +248,8 @@ def prime_commit_cache(miner, cache_manager: CacheManager, ref: str, max_items: 
         print(f"Cache already contains {initial_size} commits (>= {max_items}), skipping priming")
         return
     
-    # Import the commits query from mine_simple_dependency_updates
-    from .mine_simple_dependency_updates import COMMITS_QUERY
+    # Import the commits query from mine_dep_update_commits
+    from .mine_dep_update_commits import COMMITS_QUERY
     
     cursor = None
     items_fetched = 0

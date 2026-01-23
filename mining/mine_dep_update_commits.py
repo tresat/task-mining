@@ -5,7 +5,7 @@ import argparse
 import requests
 import re
 from typing import List, Dict, Optional, Any
-from .common import load_env, ensure_directory, process_repo_list
+from .mine_common import load_env, ensure_directory, process_repo_list
 
 # GraphQL Query to fetch commits (not PRs)
 COMMITS_QUERY = """

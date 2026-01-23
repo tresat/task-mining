@@ -8,7 +8,7 @@ import sys
 
 # Add parent directory to path to import from mining
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-from mining.common import load_env
+from mining.mine_common import load_env
 
 class PairAnalyzer:
     def __init__(self, token: str, repo_owner: str, repo_name: str):

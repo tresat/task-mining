@@ -4,7 +4,7 @@ import time
 import argparse
 import requests
 from typing import List, Dict, Optional, Generator, Any
-from .common import load_env, ensure_directory, process_repo_list
+from .mine_common import load_env, ensure_directory, process_repo_list
 
 # GraphQL Queries
 PR_QUERY = """

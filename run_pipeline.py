@@ -5,7 +5,7 @@ import os
 import json
 import signal
 from contextlib import contextmanager
-from mining.common import load_env
+from mining.mine_common import load_env
 
 @contextmanager
 def timeout_context(seconds, repo_name):
@@ -59,7 +59,7 @@ def prime_cache_for_repo(repo, mining_type):
     print(f"{'='*60}\n")
     
     if mining_type == "fixes":
-        from mining.mine_fixes import GitHubMiner
+        from mining.mine_prs import GitHubMiner
         from mining.cache import CacheManager, prime_pr_cache, MAX_CACHE_ITEMS
         
         miner = GitHubMiner(token, owner, name)
@@ -68,7 +68,7 @@ def prime_cache_for_repo(repo, mining_type):
         prime_pr_cache(miner, cache_manager, max_items=MAX_CACHE_ITEMS)
         
     elif mining_type == "simple-dep-updates":
-        from mining.mine_simple_dependency_updates import SimpleDependencyMiner
+        from mining.mine_dep_update_commits import SimpleDependencyMiner
         from mining.cache import CacheManager, prime_commit_cache, MAX_CACHE_ITEMS
         
         miner = SimpleDependencyMiner(token, owner, name)
@@ -113,13 +113,13 @@ def run_mining(repo, search_limit, results_limit, mining_type, output_dir, state
     
     if mining_type == "fixes":
         run_step(
-            ["python3", "-m", "mining.mine_fixes", repo] + limit_args + ["--output", "results", "--state", state_dir],
+            ["python3", "-m", "mining.mine_prs", repo] + limit_args + ["--output", "results", "--state", state_dir],
             f"Step 1: Mining 'Bad -> Good' Pairs for {repo}"
         )
         classification_input = per_repo_output
     elif mining_type == "simple-dep-updates":
         run_step(
-            ["python3", "-m", "mining.mine_simple_dependency_updates", repo] + limit_args + ["--output", "results", "--state", state_dir],
+            ["python3", "-m", "mining.mine_dep_update_commits", repo] + limit_args + ["--output", "results", "--state", state_dir],
             f"Step 1: Mining Simple Dependency Updates for {repo}"
         )
         classification_input = per_repo_output
