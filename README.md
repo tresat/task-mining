@@ -77,11 +77,13 @@ All mining scripts now use a **unified JSON format** with date fields and catego
     }
   ],
   "category": null,
-  "sub_category": null
+  "sub_category": null,
+  "error": null
 }
 ```
 
 **Note:** 
+- `pr_id` is `null` for commit-based mining (only available for PR-based mining)
 - `repo_url` contains the GitHub repository URL (e.g., `https://github.com/owner/repo`)
 - `from_date` and `to_date` are ISO 8601 timestamps from GitHub's `committedDate` field
   - For PR-based mining: `from_date` is the bad commit's date, `to_date` is the good commit's date
@@ -89,8 +91,8 @@ All mining scripts now use a **unified JSON format** with date fields and catego
 - `files_changed` is always an array, even for single-file changes
 - For PR-based mining, `files_changed` is initially empty and populated by classification scripts
 - For commit-based mining, `files_changed` contains detailed line-level change information
-- Fields not applicable to a specific mining type (e.g., `pr_id` for commit-based mining) are left empty or null
 - `category` and `sub_category` are initialized to `null` and populated by classification steps
+- `error` is `null` when successful. If classification or other operations fail, contains descriptive error message (e.g., "429: Quota exceeded...")
 
 ## Output Structure
 

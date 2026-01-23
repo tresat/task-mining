@@ -36,10 +36,15 @@ class GeminiClassifier:
             print(f"Error fetching diff for {commit_sha}: {e}")
             return ""
 
-    def classify_with_gemini(self, message: str, diff: str) -> str:
-        """Asks Gemini for sub-categorization using REST API."""
+    def classify_with_gemini(self, message: str, diff: str) -> dict:
+        """Asks Gemini for sub-categorization using REST API.
+        
+        Returns:
+            dict with 'sub_category' and 'error' keys. 
+            If successful, error is None. If failed, sub_category is None and error contains descriptive message.
+        """
         if not diff:
-            return "Unknown (No Diff)"
+            return {"sub_category": "Unknown (No Diff)", "error": None}
             
         prompt_text = f"""
         Analyze the following commit to determine its sub-category.
@@ -74,24 +79,27 @@ class GeminiClassifier:
                     answer = data["candidates"][0]["content"]["parts"][0]["text"].strip()
                     # Extract the sub-category from the response
                     if "Dependency Update" in answer:
-                        return "Dependency Update"
+                        return {"sub_category": "Dependency Update", "error": None}
                     elif "Bug Fix" in answer:
-                        return "Bug Fix"
+                        return {"sub_category": "Bug Fix", "error": None}
                     elif "Feature" in answer:
-                        return "Feature"
+                        return {"sub_category": "Feature", "error": None}
                     elif "Refactor" in answer:
-                        return "Refactor"
+                        return {"sub_category": "Refactor", "error": None}
                     else:
-                        return "Other"
+                        return {"sub_category": "Other", "error": None}
                 except (KeyError, IndexError) as e:
-                    print(f"Error parsing Gemini response: {e}")
-                    return "ERROR"
+                    error_msg = f"Error parsing Gemini response: {e}"
+                    print(error_msg)
+                    return {"sub_category": None, "error": error_msg}
             else:
-                print(f"Gemini API Error {response.status_code}: {response.text}")
-                return "ERROR"
+                error_msg = f"{response.status_code}: {response.text}"
+                print(f"Gemini API Error {error_msg}")
+                return {"sub_category": None, "error": error_msg}
         except Exception as e:
+            error_msg = f"Request error: {str(e)}"
             print(f"Gemini Request Error: {e}")
-            return "ERROR"
+            return {"sub_category": None, "error": error_msg}
 
     def run(self, input_file: str):
         """Classifies pairs in-place, updating the sub_category field."""
@@ -129,10 +137,13 @@ class GeminiClassifier:
             diff = self.get_commit_diff(to_commit)
             
             print(f"  Asking Gemini...")
-            ai_verdict = self.classify_with_gemini(msg, diff)
+            result = self.classify_with_gemini(msg, diff)
+            ai_verdict = result["sub_category"]
+            error = result["error"]
             print(f"  Sub-category: {ai_verdict}")
             
             pair["sub_category"] = ai_verdict
+            pair["error"] = error
             processed_commits.add(to_commit)
             new_count += 1
             

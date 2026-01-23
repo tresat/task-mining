@@ -269,7 +269,8 @@ class GitHubMiner:
                                 "to_date": commit["committedDate"],
                                 "files_changed": [],  # Not available for PR-based mining; can be populated by classification
                                 "category": None,
-                                "sub_category": None
+                                "sub_category": None,
+                                "error": None
                             }
                             # Check for duplicates before adding
                             if not any(r['to_commit'] == oid for r in results):
@@ -369,7 +370,8 @@ class GitHubMiner:
                                 "to_date": commit["committedDate"],
                                 "files_changed": [],  # Not available for PR-based mining; can be populated by classification
                                 "category": None,
-                                "sub_category": None
+                                "sub_category": None,
+                                "error": None
                             }
                             # Check for duplicates before adding
                             if not any(r['to_commit'] == oid for r in results) and not any(r['to_commit'] == oid for r in batch_results):

@@ -481,6 +481,7 @@ class SimpleDependencyMiner:
                 
                 # Create result entry
                 result = {
+                    "pr_id": None,  # Not available for commit-based mining
                     "repo_url": f"https://github.com/{self.owner}/{self.name}",
                     "from_commit": parent_oid,
                     "from_msg": "",  # Parent message not available without additional API call
@@ -495,7 +496,8 @@ class SimpleDependencyMiner:
                         "to_line_contents": version_change["to_line"]
                     }],
                     "category": None,
-                    "sub_category": None
+                    "sub_category": None,
+                    "error": None
                 }
                 
                 # Check for duplicates before adding
