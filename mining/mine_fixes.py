@@ -356,7 +356,7 @@ def main():
     parser.add_argument("--search-limit", type=int, help="Maximum number of PRs to search through")
     parser.add_argument("--results-limit", type=int, help="Maximum number of valid pairs to find")
     parser.add_argument("--output", default="results", help="Output directory for results")
-    parser.add_argument("--state", default="state", help="Directory for state files (default: state)")
+    parser.add_argument("--state", default=".state", help="Directory for state files (default: .state)")
     
     args = parser.parse_args()
     

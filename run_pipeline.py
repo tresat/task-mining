@@ -111,7 +111,7 @@ def process_repo(repo, search_limit, results_limit, mining_type, classifier, tim
 
     owner, name = repo.split("/", 1)
     output_dir = os.path.join("results", f"{owner}_{name}")
-    state_dir = "state"
+    state_dir = ".state"
     os.makedirs(output_dir, exist_ok=True)
     os.makedirs(state_dir, exist_ok=True)
     
@@ -168,7 +168,7 @@ def main():
     parser.add_argument("--search-limit", type=int, help="Maximum number of PRs/commits to search through (stops after searching this many items)")
     parser.add_argument("--results-limit", type=int, help="Maximum number of valid results to find (stops after finding this many valid pairs)")
     parser.add_argument("--timeout", type=int, default=120, help="Timeout in seconds for processing each repository (default: 120)")
-    parser.add_argument("--clean", action="store_true", help="Clean previous results/state before running (deletes entire results/ and state/ directories)")
+    parser.add_argument("--clean", action="store_true", help="Clean previous results/state before running (deletes entire results/ and .state/ directories)")
     parser.add_argument("--type", default="fixes", choices=["fixes", "simple-dep-updates"],
                        help="Type of mining to run (Step 1): 'fixes' (PR-based bad->good) or 'simple-dep-updates' (single-line dependency updates). Default: fixes")
     parser.add_argument("--classifier", default="simple", choices=["simple", "ai"],
@@ -188,7 +188,7 @@ def main():
     if args.clean:
         import shutil
         results_dir = "results"
-        state_dir = "state"
+        state_dir = ".state"
         
         if os.path.exists(results_dir):
             print(f"Cleaning entire {results_dir}/ directory...")

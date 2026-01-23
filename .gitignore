@@ -4,4 +4,4 @@ __pycache__/
 .idea/
 inputs/
 results/
-state/
+.state/

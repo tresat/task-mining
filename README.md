@@ -12,7 +12,7 @@ This project mines GitHub repositories for "Self-Correction" pairs (Bad Commit -
   - `analyze_pairs.py` - Heuristic classification of mining results
   - `gemini_classifier.py` - AI-powered classification using Gemini
 - `/test` - Unit tests for mining and classification scripts
-- `/state` - State files for resumable mining (gitignored)
+- `/.state` - State files for resumable mining (gitignored)
 - `/results` - Mining results (gitignored)
 - `/samples` - Sample output files for reference
 
@@ -76,7 +76,7 @@ All mining scripts now use a **unified JSON format** to ensure consistency:
   - Prevents individual repositories from hanging indefinitely
   - Example: `--timeout 300` for 5-minute timeout
 - **Clean Option** (`--clean`):
-  - Deletes entire `results/` and `state/` directories before running
+  - Deletes entire `results/` and `.state/` directories before running
   - Useful for starting fresh or after changing mining parameters
   - Executes before any mining or classification begins
 - **Usage (Single Repo)**:
@@ -117,14 +117,14 @@ All mining scripts now use a **unified JSON format** to ensure consistency:
   # Process simple-dep-updates with longer timeout for slow repos
   python3 run_pipeline.py repos.txt --search-limit 100 --type simple-dep-updates --timeout 600
   ```
-  Results will be saved in `results/{owner}_{name}/`, state files in `state/`.
+  Results will be saved in `results/{owner}_{name}/`, state files in `.state/`.
 
 ### 1. `mining/mine_fixes.py` (The Fixes Miner)
 **Function**: Identifies "Self-Correction" pairs in merged PRs.
 - **Logic**: Scans PRs for a sequence of `Failure -> Success` commits.
 - **Input**: GitHub Repo (owner/name) OR a text file with a list of repos (one per line)
 - **Output**: `results/{owner}_{name}/mining_results.json`
-- **State Files**: Stored in `state/{owner}_{name}_mining_state.json`
+- **State Files**: Stored in `.state/{owner}_{name}_mining_state.json`
 - **Usage (Single Repo)**:
   ```bash
   python3 -m mining.mine_fixes android/nowinandroid --limit 100
@@ -140,7 +140,7 @@ All mining scripts now use a **unified JSON format** to ensure consistency:
 - **Branch Detection**: Automatically detects the default branch (tries `main` first, then `master`).
 - **Input**: GitHub Repo (owner/name) OR a text file with a list of repos (one per line)
 - **Output**: `results/{owner}_{name}/simple_dependency_updates.json`
-- **State Files**: Stored in `state/{owner}_{name}_simple_dependency_state.json`
+- **State Files**: Stored in `.state/{owner}_{name}_simple_dependency_state.json`
 - **Usage (Single Repo)**:
   ```bash
   python3 -m mining.mine_simple_dependency_updates android/nowinandroid --limit 1000
@@ -177,13 +177,13 @@ All mining scripts now use a **unified JSON format** to ensure consistency:
 ## Resumability
 All mining scripts support resuming if interrupted.
 
-- **mining/mine_fixes.py**: Uses state files in the `state/` directory (e.g., `state/{owner}_{name}_mining_state.json`).
+- **mining/mine_fixes.py**: Uses state files in the `.state/` directory (e.g., `.state/{owner}_{name}_mining_state.json`).
   - To resume: Just run the same command again.
-  - To restart: Delete the corresponding state file in `state/` and the results in `results/{owner}_{name}/mining_results.json`.
+  - To restart: Delete the corresponding state file in `.state/` and the results in `results/{owner}_{name}/mining_results.json`.
 
-- **mining/mine_simple_dependency_updates.py**: Uses state files in the `state/` directory (e.g., `state/{owner}_{name}_simple_dependency_state.json`).
+- **mining/mine_simple_dependency_updates.py**: Uses state files in the `.state/` directory (e.g., `.state/{owner}_{name}_simple_dependency_state.json`).
   - To resume: Just run the same command again.
-  - To restart: Delete the corresponding state file in `state/` and the results in `results/{owner}_{name}/simple_dependency_updates.json`.
+  - To restart: Delete the corresponding state file in `.state/` and the results in `results/{owner}_{name}/simple_dependency_updates.json`.
 
 - **gemini_classifier.py**: Checks `ai_classified_results.json` for existing entries.
   - To resume: Run the command again; it skips already classified pairs.

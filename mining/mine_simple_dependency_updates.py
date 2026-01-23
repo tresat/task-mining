@@ -579,7 +579,7 @@ def main():
     parser.add_argument("--search-limit", type=int, help="Maximum number of commits to search through")
     parser.add_argument("--results-limit", type=int, help="Maximum number of valid updates to find")
     parser.add_argument("--output", default="results", help="Output directory for results")
-    parser.add_argument("--state", default="state", help="Directory for state files (default: state)")
+    parser.add_argument("--state", default=".state", help="Directory for state files (default: .state)")
     parser.add_argument("--ref", default=None, help="Git ref to scan (e.g., refs/heads/main). If not specified, auto-detects main or master")
     
     args = parser.parse_args()
