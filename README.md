@@ -11,6 +11,7 @@ This project mines GitHub repositories for "Self-Correction" pairs (Bad Commit -
 - `/test` - Unit tests for mining scripts
 - `/state` - State files for resumable mining (gitignored)
 - `/results` - Mining results (gitignored)
+- `/samples` - Sample output files for reference
 
 ## Scripts
 
