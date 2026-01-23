@@ -5,17 +5,22 @@ This project mines GitHub repositories for "Self-Correction" pairs (Bad Commit -
 ## Project Structure
 
 - `/mining` - Mining scripts for extracting data from repositories
-  - `mine_fixes.py` - Mines PR-based bad->good commit pairs
-  - `mine_simple_dependency_updates.py` - Mines single-line dependency updates
+  - `mine_prs.py` - Mines PR-based commit pairs (formerly mine_fixes.py)
+  - `mine_dep_update_commits.py` - Mines single-line dependency updates (formerly mine_simple_dependency_updates.py)
   - `cache.py` - GitHub API caching system
-  - `common.py` - Shared utilities for mining scripts
+  - `mine_common.py` - Shared utilities for mining scripts (formerly common.py)
 - `/classification` - Classification and analysis scripts
-  - `analyze_pairs.py` - Heuristic classification of mining results
+  - `simple_classifier.py` - Heuristic classification of mining results (formerly analyze_pairs.py)
   - `gemini_classifier.py` - AI-powered classification using Gemini
+- `/reporting` - Reporting and dashboard generation scripts
+  - `build_dashboard.py` - Generates interactive HTML dashboard from results
 - `/test` - Unit tests for mining and classification scripts
 - `/.state` - State files for resumable mining (gitignored)
 - `/.cache` - GitHub API response cache (gitignored)
 - `/results` - Mining results (gitignored)
+  - `/per_repo/` - Individual JSON files per repository
+  - `results.json` - Aggregated results from all repositories
+  - `dashboard.html` - Interactive visualization dashboard
 - `/samples` - Sample output files for reference
 
 ## GitHub API Caching
@@ -99,7 +104,41 @@ All mining scripts now use a **unified JSON format** with date fields and catego
 
 Results are now organized as follows:
 - `results/per_repo/{owner}_{name}.json` - Individual repository results (one file per repo, regardless of mining type)
-- `results/results.json` - Aggregated results from all repositories (created at the end of the pipeline)
+- `results/results.json` - Aggregated results from all repositories (created at the end of the pipeline, even if empty)
+- `results/dashboard.html` - Interactive HTML dashboard for visualizing results
+
+## Interactive Dashboard
+
+The pipeline automatically generates an interactive HTML dashboard at `results/dashboard.html` that provides:
+
+**Features:**
+- **Group By Toggle**: Switch between grouping results by Category or Tags
+- **Statistics Overview**: Total results, number of categories/tags, repositories analyzed
+- **Distribution Chart**: Visual breakdown using doughnut chart
+- **Detailed Results View**: Searchable list of all mining results with:
+  - Repository names and links
+  - PR numbers (if applicable)
+  - Commit dates
+  - Category and tag badges
+  - Files changed
+  - Error messages (if any)
+
+**Usage:**
+```bash
+# Dashboard is automatically generated after running the pipeline
+python3 run_pipeline.py android/nowinandroid --search-limit 100
+
+# Open the dashboard
+open results/dashboard.html  # macOS
+xdg-open results/dashboard.html  # Linux
+start results/dashboard.html  # Windows
+```
+
+**Manual Generation:**
+```bash
+# Generate dashboard from existing results.json
+python3 -m reporting.build_dashboard
+```
 
 ## Scripts
 
@@ -113,6 +152,7 @@ Results are now organized as follows:
 - **Step 2**: Simple Classifier - Analyzes mining results in-place, categorizes dependency changes, updates `category` field and adds `tags`
 - **Step 2b**: AI Classification - Deepens analysis using Gemini (requires GEMINI_API_KEY), adds AI-generated tags to `tags` array
 - **Step 3**: Aggregation - Combines all per_repo files into `results/results.json`
+- **Step 4**: Dashboard Generation - Creates interactive HTML dashboard at `results/dashboard.html`
 
 **Parameters:**
 - **Mining Types** (`--type`): Controls Step 1

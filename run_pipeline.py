@@ -185,36 +185,39 @@ def aggregate_results():
     per_repo_dir = os.path.join("results", "per_repo")
     output_file = os.path.join("results", "results.json")
     
-    if not os.path.exists(per_repo_dir):
-        print(f"No per_repo directory found at {per_repo_dir}")
-        return
-    
     all_results = []
     file_count = 0
     
-    # Read all JSON files from per_repo directory
-    for filename in os.listdir(per_repo_dir):
-        if filename.endswith(".json"):
-            filepath = os.path.join(per_repo_dir, filename)
-            try:
-                with open(filepath, 'r') as f:
-                    data = json.load(f)
-                    if isinstance(data, list):
-                        all_results.extend(data)
-                        file_count += 1
-                        print(f"Added {len(data)} results from {filename}")
-                    else:
-                        print(f"Warning: {filename} does not contain a list, skipping")
-            except Exception as e:
-                print(f"Error reading {filename}: {e}")
+    if os.path.exists(per_repo_dir):
+        # Read all JSON files from per_repo directory
+        for filename in os.listdir(per_repo_dir):
+            if filename.endswith(".json"):
+                filepath = os.path.join(per_repo_dir, filename)
+                try:
+                    with open(filepath, 'r') as f:
+                        data = json.load(f)
+                        if isinstance(data, list):
+                            all_results.extend(data)
+                            file_count += 1
+                            print(f"Added {len(data)} results from {filename}")
+                        else:
+                            print(f"Warning: {filename} does not contain a list, skipping")
+                except Exception as e:
+                    print(f"Error reading {filename}: {e}")
+    else:
+        print(f"No per_repo directory found at {per_repo_dir}")
     
-    # Write aggregated results
+    # Always write results file, even if empty
+    from mining.mine_common import ensure_directory
+    ensure_directory(os.path.dirname(output_file))
+    
+    with open(output_file, 'w') as f:
+        json.dump(all_results, f, indent=2)
+    
     if all_results:
-        with open(output_file, 'w') as f:
-            json.dump(all_results, f, indent=2)
         print(f"\n✓ Aggregated {len(all_results)} total results from {file_count} repositories into {output_file}")
     else:
-        print("\nNo results to aggregate")
+        print(f"\n✓ Created empty results file at {output_file}")
 
 def validate_tokens(classifier):
     """
@@ -344,6 +347,10 @@ def main():
     
     # Step 3: Aggregate all results into a single file
     aggregate_results()
+    
+    # Step 4: Build dashboard
+    from reporting.build_dashboard import build_dashboard
+    build_dashboard()
             
     print("\nPipeline Complete!")
 
