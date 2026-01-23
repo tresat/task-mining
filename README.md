@@ -62,11 +62,9 @@ All mining scripts now use a **unified JSON format** to ensure consistency:
 - **Mining Types** (`--type`): Controls Step 1
   - `fixes` (default): PR-based bad->good commit pairs
   - `simple-dep-updates`: Single-line dependency updates only
-  - `both`: Runs both mining types
 - **Classification Options** (`--classifier`): Controls Steps 2 and 2b, runs on the results from Step 1
-  - `simple`: Heuristic classification only (fast)
-  - `ai`: AI classification with Gemini (requires simple as prerequisite)
-  - `both` (default): Runs both simple and AI classification
+  - `simple` (default): Heuristic classification only (fast)
+  - `ai`: AI classification with Gemini (automatically runs simple as prerequisite)
 - **Limit Options**:
   - `--search-limit`: Maximum number of PRs/commits to search through (stops after searching this many items)
   - `--results-limit`: Maximum number of valid results to find (stops after finding this many valid pairs/updates)
@@ -98,23 +96,26 @@ All mining scripts now use a **unified JSON format** to ensure consistency:
   # Run with clean (deletes all previous results first)
   python3 run_pipeline.py android/nowinandroid --search-limit 100 --type fixes --clean
   
-  # Run only simple classification
-  python3 run_pipeline.py android/nowinandroid --search-limit 100 --type fixes --classifier simple
+  # Run only simple classification (default)
+  python3 run_pipeline.py android/nowinandroid --search-limit 100 --type fixes
   
-  # Run simple-dep-updates mining with both classifiers
-  python3 run_pipeline.py android/nowinandroid --results-limit 100 --type simple-dep-updates --classifier both
+  # Run with AI classification (simple runs automatically as prerequisite)
+  python3 run_pipeline.py android/nowinandroid --search-limit 100 --type fixes --classifier ai
   
-  # Run simple-dep-updates with only AI classification
+  # Run simple-dep-updates mining with simple classification
+  python3 run_pipeline.py android/nowinandroid --results-limit 100 --type simple-dep-updates
+  
+  # Run simple-dep-updates with AI classification
   python3 run_pipeline.py android/nowinandroid --results-limit 100 --type simple-dep-updates --classifier ai
   ```
 - **Usage (Multi-Repo)**:
   Create a file `repos.txt` with one repo per line, then:
   ```bash
   # Process multiple repos with 2-minute timeout per repo (default)
-  python3 run_pipeline.py repos.txt --search-limit 100 --type both --clean
+  python3 run_pipeline.py repos.txt --search-limit 100 --type fixes --clean
   
-  # Process with longer timeout for slow repos
-  python3 run_pipeline.py repos.txt --search-limit 100 --type both --timeout 600
+  # Process simple-dep-updates with longer timeout for slow repos
+  python3 run_pipeline.py repos.txt --search-limit 100 --type simple-dep-updates --timeout 600
   ```
   Results will be saved in `results/{owner}_{name}/`, state files in `state/`.
 
