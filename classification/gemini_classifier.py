@@ -138,11 +138,17 @@ class GeminiClassifier:
             
             print(f"  Asking Gemini...")
             result = self.classify_with_gemini(msg, diff)
-            ai_verdict = result["sub_category"]
+            ai_tag = result["sub_category"]  # Still using sub_category key in return for now
             error = result["error"]
-            print(f"  Sub-category: {ai_verdict}")
+            print(f"  AI Tag: {ai_tag}")
             
-            pair["sub_category"] = ai_verdict
+            # Add AI tag to tags list if it's not None
+            if ai_tag:
+                if "tags" not in pair or pair["tags"] is None:
+                    pair["tags"] = []
+                if ai_tag not in pair["tags"]:
+                    pair["tags"].append(ai_tag)
+            
             pair["error"] = error
             processed_commits.add(to_commit)
             new_count += 1
@@ -158,7 +164,7 @@ class GeminiClassifier:
         # Final save
         with open(input_file, 'w') as f:
             json.dump(pairs, f, indent=2)
-        print(f"Updated {input_file} with AI sub-category classifications")
+        print(f"Updated {input_file} with AI tag classifications")
 
 def main():
     load_env()

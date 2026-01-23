@@ -496,7 +496,7 @@ class SimpleDependencyMiner:
                         "to_line_contents": version_change["to_line"]
                     }],
                     "category": None,
-                    "sub_category": None,
+                    "tags": [],
                     "error": None
                 }
                 
@@ -624,7 +624,8 @@ class SimpleDependencyMiner:
                         "to_line_contents": version_change["to_line"]
                     }],
                     "category": None,
-                    "sub_category": None
+                    "tags": [],
+                    "error": None
                 }
                 
                 # Check for duplicates before adding

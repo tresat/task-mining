@@ -269,7 +269,7 @@ class GitHubMiner:
                                 "to_date": commit["committedDate"],
                                 "files_changed": [],  # Not available for PR-based mining; can be populated by classification
                                 "category": None,
-                                "sub_category": None,
+                                "tags": [],
                                 "error": None
                             }
                             # Check for duplicates before adding
@@ -370,7 +370,7 @@ class GitHubMiner:
                                 "to_date": commit["committedDate"],
                                 "files_changed": [],  # Not available for PR-based mining; can be populated by classification
                                 "category": None,
-                                "sub_category": None,
+                                "tags": [],
                                 "error": None
                             }
                             # Check for duplicates before adding

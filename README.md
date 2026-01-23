@@ -77,7 +77,7 @@ All mining scripts now use a **unified JSON format** with date fields and catego
     }
   ],
   "category": null,
-  "sub_category": null,
+  "tags": [],
   "error": null
 }
 ```
@@ -91,7 +91,8 @@ All mining scripts now use a **unified JSON format** with date fields and catego
 - `files_changed` is always an array, even for single-file changes
 - For PR-based mining, `files_changed` is initially empty and populated by classification scripts
 - For commit-based mining, `files_changed` contains detailed line-level change information
-- `category` and `sub_category` are initialized to `null` and populated by classification steps
+- `category` is initialized to `null` and set by the simple classifier (only set to "Dependency Update" for pure libs.versions.toml changes)
+- `tags` is an empty array `[]` initially, populated by classification steps as a list of tags
 - `error` is `null` when successful. If classification or other operations fail, contains descriptive error message (e.g., "429: Quota exceeded...")
 
 ## Output Structure
@@ -109,8 +110,8 @@ Results are now organized as follows:
 - **Step 0a**: Cache Priming - Automatically primes cache with recent PRs/commits (always enabled)
 - **Step 0b**: Token Validation - Validates that required environment tokens (GITHUB_TOKEN, GEMINI_API_KEY) are set
 - **Step 1**: Mining - Extracts data based on `--type` parameter (uses cache when available), outputs to `results/per_repo/{owner}_{name}.json`
-- **Step 2**: Simple/Heuristic Classification - Analyzes mining results in-place, updates `category` field
-- **Step 2b**: AI Classification - Deepens analysis using Gemini (requires GEMINI_API_KEY), updates `sub_category` field in-place
+- **Step 2**: Simple Classifier - Analyzes mining results in-place, categorizes dependency changes, updates `category` field and adds `tags`
+- **Step 2b**: AI Classification - Deepens analysis using Gemini (requires GEMINI_API_KEY), adds AI-generated tags to `tags` array
 - **Step 3**: Aggregation - Combines all per_repo files into `results/results.json`
 
 **Parameters:**
@@ -218,26 +219,31 @@ Results are now organized as follows:
   ```
   Results will be saved in `results/per_repo/{owner}_{name}.json`.
 
-### 2. `classification/analyze_pairs.py` (The Simple/Heuristic Classifier)
-**Function**: Classifies pairs based on changed files (Fast & Cheap).
-- **Logic**: Checks if `build.gradle`, `libs.versions.toml`, or other build files were modified.
-- **Categories**: `Dependency Update` vs `Other`.
+### 2. `classification/simple_classifier.py` (The Simple Classifier)
+**Function**: Classifies changes based on dependency file modifications (Fast & Cheap).
+- **Logic**: 
+  - Checks if `libs.versions.toml` was modified
+  - Checks if changes occurred within `dependencies {}` blocks in `build.gradle` or `build.gradle.kts` files
+  - Only sets Category = "Dependency Update" if ONLY `libs.versions.toml` was changed
+  - Adds "dependencies" tag if any dependency-related changes were found
+- **Categories**: Only tags things as `Dependency Update` vs others (leaves category null for non-pure dependency changes)
+- **Tags**: Adds "dependencies" tag when applicable
 - **Input**: `results/per_repo/{owner}_{name}.json` (auto-detected from repo name)
-- **Output**: Updates the same file in-place, setting the `category` field
+- **Output**: Updates the same file in-place, setting the `category` field and adding to `tags` array
 - **Usage**:
   ```bash
-  python3 -m classification.analyze_pairs android/nowinandroid
+  python3 -m classification.simple_classifier android/nowinandroid
   # Or with custom input:
-  python3 -m classification.analyze_pairs android/nowinandroid --input custom_file.json
+  python3 -m classification.simple_classifier android/nowinandroid --input custom_file.json
   ```
 
 ### 2b. `classification/gemini_classifier.py` (The AI Classifier)
 **Function**: Classifies pairs using an LLM (Gemini) for deeper understanding.
-- **Logic**: Fetches the actual code diff and asks Gemini for sub-categorization.
-- **Sub-categories**: `Dependency Update`, `Bug Fix`, `Feature`, `Refactor`, `Other`.
+- **Logic**: Fetches the actual code diff and asks Gemini for categorization.
+- **Tag Types**: `Dependency Update`, `Bug Fix`, `Feature`, `Refactor`, `Other`.
 - **Benefit**: Can distinguish between different types of changes beyond simple file-based heuristics.
 - **Input**: `results/per_repo/{owner}_{name}.json` (auto-detected from repo name)
-- **Output**: Updates the same file in-place, setting the `sub_category` field
+- **Output**: Updates the same file in-place, adding AI-generated tag to `tags` array
 - **Usage**:
   ```bash
   python3 -m classification.gemini_classifier android/nowinandroid
@@ -252,13 +258,13 @@ All mining scripts support resuming if interrupted.
   - To resume: Just run the same command again.
   - To restart: Delete the corresponding state file in `.state/` and the results in `results/per_repo/{owner}_{name}.json`.
 
-- **mining/mine_simple_dependency_updates.py**: Uses state files in the `.state/` directory (e.g., `.state/{owner}_{name}_simple_dependency_state.json`).
+- **mining/mine_dep_update_commits.py**: Uses state files in the `.state/` directory (e.g., `.state/{owner}_{name}_simple_dependency_state.json`).
   - To resume: Just run the same command again.
   - To restart: Delete the corresponding state file in `.state/` and the results in `results/per_repo/{owner}_{name}.json`.
 
-- **gemini_classifier.py**: Checks for existing `sub_category` values in the input file.
+- **gemini_classifier.py**: Checks for existing tag values in the input file.
   - To resume: Run the command again; it skips already classified pairs.
-  - To restart: Delete or reset the `sub_category` field in the per_repo JSON file.
+  - To restart: Delete or reset the `tags` field in the per_repo JSON file.
 
 ## Setup
 

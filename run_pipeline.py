@@ -137,16 +137,16 @@ def run_classification(repo, classifier, classification_input):
     # Step 2: Simple/Heuristic Classification (runs on any mining type)
     if classifier == "simple":
         run_step(
-            ["python3", "-m", "classification.analyze_pairs", repo, "--input", classification_input],
-            f"Step 2: Running Simple/Heuristic Classification for {repo}"
+            ["python3", "-m", "classification.simple_classifier", repo, "--input", classification_input],
+            f"Step 2: Running Simple Classifier for {repo}"
         )
     
     # Step 2b: AI Classification (runs on any mining type)
     elif classifier == "ai":
         # AI classifier needs analyzed results, so run simple first as prerequisite
         run_step(
-            ["python3", "-m", "classification.analyze_pairs", repo, "--input", classification_input],
-            f"Step 2: Running Simple/Heuristic Classification for {repo} (prerequisite for AI)"
+            ["python3", "-m", "classification.simple_classifier", repo, "--input", classification_input],
+            f"Step 2: Running Simple Classifier for {repo} (prerequisite for AI)"
         )
         run_step(
             ["python3", "-m", "classification.gemini_classifier", repo, "--input", classification_input],
