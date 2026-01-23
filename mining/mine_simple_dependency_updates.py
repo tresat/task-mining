@@ -526,10 +526,11 @@ class SimpleDependencyMiner:
                 break
             
             # Determine batch size
+            from .cache import COMMIT_BATCH_SIZE
             if search_limit:
-                batch_size = min(100, search_limit - processed_count)
+                batch_size = min(COMMIT_BATCH_SIZE, search_limit - processed_count)
             else:
-                batch_size = 100
+                batch_size = COMMIT_BATCH_SIZE
                 
             variables = {
                 "owner": self.owner,

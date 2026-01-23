@@ -303,10 +303,11 @@ class GitHubMiner:
                 break
             
             # Determine batch size
+            from .cache import PR_BATCH_SIZE
             if search_limit:
-                batch_size = min(50, search_limit - processed_count)
+                batch_size = min(PR_BATCH_SIZE, search_limit - processed_count)
             else:
-                batch_size = 50
+                batch_size = PR_BATCH_SIZE
                 
             variables = {
                 "owner": self.owner,
