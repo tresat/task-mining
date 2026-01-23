@@ -18,10 +18,6 @@ def build_dashboard(results_file="results/results.json", output_file="results/da
         results_file: Path to the aggregated results.json file
         output_file: Path where the dashboard HTML will be saved
     """
-    print(f"\n{'='*60}")
-    print("Building Dashboard")
-    print(f"{'='*60}\n")
-    
     # Load results data
     if not os.path.exists(results_file):
         print(f"No results file found at {results_file}")
@@ -332,6 +328,36 @@ def generate_dashboard_html(raw_data):
             border-radius: 0.375rem;
         }}
 
+        .error-toggle {{
+            cursor: pointer;
+            color: #f87171;
+            text-decoration: underline;
+            margin-top: 0.5rem;
+        }}
+
+        .error-toggle:hover {{
+            color: #fca5a5;
+        }}
+
+        .error-details {{
+            display: none;
+            margin-top: 0.5rem;
+            padding: 0.75rem;
+            background-color: rgba(248, 113, 113, 0.1);
+            border-radius: 0.375rem;
+            border-left: 3px solid #f87171;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85rem;
+            color: #f87171;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            overflow-x: auto;
+        }}
+
+        .error-details.show {{
+            display: block;
+        }}
+
         .empty-state {{
             text-align: center;
             padding: 4rem 2rem;
@@ -539,10 +565,19 @@ def generate_dashboard_html(raw_data):
                     filesInfo = `<div class="files-changed">Files changed: ${{result.files_changed.map(f => f.filename).join(', ')}}</div>`;
                 }}
                 
-                // Build error message if present
+                // Build error message if present (collapsible for long errors)
                 let errorInfo = '';
                 if (result.error) {{
-                    errorInfo = `<div class="error-message">⚠️ Error: ${{result.error}}</div>`;
+                    const errorId = `error-${{Math.random().toString(36).substr(2, 9)}}`;
+                    errorInfo = `
+                        <div class="error-message">
+                            ⚠️ Error occurred 
+                            <a class="error-toggle" onclick="document.getElementById('${{errorId}}').classList.toggle('show'); return false;" href="#">
+                                (click to expand/collapse)
+                            </a>
+                            <div id="${{errorId}}" class="error-details">${{result.error}}</div>
+                        </div>
+                    `;
                 }}
                 
                 const title = result.to_msg || result.from_msg || 'No message';

@@ -83,7 +83,7 @@ def prime_cache_for_repo(repo, mining_type):
 
 def run_mining(repo, search_limit, results_limit, mining_type, output_dir, state_dir):
     """
-    Run Step 1: Mining based on the specified type.
+    Run mining based on the specified type.
     
     Returns:
         Path to the mining output file to use for classification, or None
@@ -107,7 +107,7 @@ def run_mining(repo, search_limit, results_limit, mining_type, output_dir, state
     if results_limit:
         limit_args.extend(["--results-limit", str(results_limit)])
     
-    # Step 1: Mine based on type (no header output)
+    # Mine based on type (no header output)
     classification_input = None
     
     if mining_type == "fixes":
@@ -129,29 +129,32 @@ def run_mining(repo, search_limit, results_limit, mining_type, output_dir, state
 
 def run_classification(repo, classifier, classification_input):
     """
-    Run Steps 2 and 2b: Classification based on the specified classifier.
+    Run classification based on the specified classifier.
     Edits the per_repo file in-place.
     """
     if not classification_input or not os.path.exists(classification_input):
         return
     
-    # Step 2: Simple/Heuristic Classification (runs on any mining type)
+    # Simple/Heuristic Classification (runs on any mining type)
     if classifier == "simple":
         run_step(
             ["python3", "-m", "classification.simple_classifier", repo, "--input", classification_input],
-            f"Step 2: Running Simple Classifier for {repo}"
+            f"Running Simple Classifier for {repo}",
+            show_header=False
         )
     
-    # Step 2b: AI Classification (runs on any mining type)
+    # AI Classification (runs on any mining type)
     elif classifier == "ai":
         # AI classifier needs analyzed results, so run simple first as prerequisite
         run_step(
             ["python3", "-m", "classification.simple_classifier", repo, "--input", classification_input],
-            f"Step 2: Running Simple Classifier for {repo} (prerequisite for AI)"
+            f"Running Simple Classifier for {repo} (prerequisite for AI)",
+            show_header=False
         )
         run_step(
             ["python3", "-m", "classification.gemini_classifier", repo, "--input", classification_input],
-            f"Step 2b: Running AI Classification (Gemini) for {repo}"
+            f"Running AI Classification (Gemini) for {repo}",
+            show_header=False
         )
 
 def process_repo(repo, search_limit, results_limit, mining_type, classifier, timeout_seconds):
@@ -167,10 +170,10 @@ def process_repo(repo, search_limit, results_limit, mining_type, classifier, tim
     os.makedirs(output_dir, exist_ok=True)
     os.makedirs(state_dir, exist_ok=True)
     
-    # Step 1: Mining
+    # Mining
     classification_input = run_mining(repo, search_limit, results_limit, mining_type, output_dir, state_dir)
     
-    # Steps 2 and 2b: Classification
+    # Classification
     run_classification(repo, classifier, classification_input)
 
 def aggregate_results():
