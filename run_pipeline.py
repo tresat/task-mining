@@ -64,65 +64,53 @@ def process_repo(repo, search_limit, results_limit, mining_type, classifier, tim
         limit_args.extend(["--results-limit", str(results_limit)])
     
     # Step 1: Mine based on type
+    # Determine which mining output to use for classification
+    classification_input = None
+    
     if mining_type == "fixes":
         run_step(
             ["python3", "-m", "mining.mine_fixes", repo] + limit_args + ["--output", "results", "--state", state_dir],
-            f"Mining 'Bad -> Good' Pairs for {repo}"
+            f"Step 1: Mining 'Bad -> Good' Pairs for {repo}"
         )
-        
-        # Step 2: Classification based on classifier option
-        if classifier in ["simple", "both"]:
-            run_step(
-                ["python3", "-m", "classification.analyze_pairs", repo, "--input", mining_output, "--output", analyzed_output],
-                f"Running Simple/Heuristic Analysis for {repo}"
-            )
-        
-        # Step 3: AI Classification
-        if classifier in ["ai", "both"]:
-            # AI classifier needs analyzed results, so run simple first if not already run
-            if classifier == "ai":
-                run_step(
-                    ["python3", "-m", "classification.analyze_pairs", repo, "--input", mining_output, "--output", analyzed_output],
-                    f"Running Simple/Heuristic Analysis for {repo} (prerequisite for AI)"
-                )
-            run_step(
-                ["python3", "-m", "classification.gemini_classifier", repo, "--input", analyzed_output, "--output", ai_output],
-                f"Running AI Classification (Gemini) for {repo}"
-            )
+        classification_input = mining_output
     elif mining_type == "simple-dep-updates":
         run_step(
             ["python3", "-m", "mining.mine_simple_dependency_updates", repo] + limit_args + ["--output", "results", "--state", state_dir],
-            f"Mining Simple Dependency Updates for {repo}"
+            f"Step 1: Mining Simple Dependency Updates for {repo}"
         )
+        classification_input = simple_dep_output
     elif mining_type == "both":
         # Run both mining types
         run_step(
             ["python3", "-m", "mining.mine_fixes", repo] + limit_args + ["--output", "results", "--state", state_dir],
-            f"Mining 'Bad -> Good' Pairs for {repo}"
+            f"Step 1a: Mining 'Bad -> Good' Pairs for {repo}"
         )
         run_step(
             ["python3", "-m", "mining.mine_simple_dependency_updates", repo] + limit_args + ["--output", "results", "--state", state_dir],
-            f"Mining Simple Dependency Updates for {repo}"
+            f"Step 1b: Mining Simple Dependency Updates for {repo}"
         )
-        
-        # Run classification on fixes mining results based on classifier option
-        if classifier in ["simple", "both"]:
+        # For 'both', we'll classify the fixes mining results
+        classification_input = mining_output
+    
+    # Step 2: Simple/Heuristic Classification (runs on any mining type)
+    if classifier in ["simple", "both"] and classification_input:
+        run_step(
+            ["python3", "-m", "classification.analyze_pairs", repo, "--input", classification_input, "--output", analyzed_output],
+            f"Step 2: Running Simple/Heuristic Classification for {repo}"
+        )
+    
+    # Step 2b: AI Classification (runs on any mining type)
+    if classifier in ["ai", "both"] and classification_input:
+        # AI classifier needs analyzed results, so run simple first if not already run
+        if classifier == "ai":
             run_step(
-                ["python3", "-m", "classification.analyze_pairs", repo, "--input", mining_output, "--output", analyzed_output],
-                f"Running Simple/Heuristic Analysis for {repo}"
+                ["python3", "-m", "classification.analyze_pairs", repo, "--input", classification_input, "--output", analyzed_output],
+                f"Step 2: Running Simple/Heuristic Classification for {repo} (prerequisite for AI)"
             )
-        
-        if classifier in ["ai", "both"]:
-            # AI classifier needs analyzed results, so run simple first if not already run
-            if classifier == "ai":
-                run_step(
-                    ["python3", "-m", "classification.analyze_pairs", repo, "--input", mining_output, "--output", analyzed_output],
-                    f"Running Simple/Heuristic Analysis for {repo} (prerequisite for AI)"
-                )
-            run_step(
-                ["python3", "-m", "classification.gemini_classifier", repo, "--input", analyzed_output, "--output", ai_output],
-                f"Running AI Classification (Gemini) for {repo}"
-            )
+        run_step(
+            ["python3", "-m", "classification.gemini_classifier", repo, "--input", analyzed_output, "--output", ai_output],
+            f"Step 2b: Running AI Classification (Gemini) for {repo}"
+        )
 
 def main():
     parser = argparse.ArgumentParser(description="Run the full Task Mining Pipeline")
@@ -132,9 +120,9 @@ def main():
     parser.add_argument("--timeout", type=int, default=120, help="Timeout in seconds for processing each repository (default: 120)")
     parser.add_argument("--clean", action="store_true", help="Clean previous results/state before running (deletes entire results/ and state/ directories)")
     parser.add_argument("--type", default="fixes", choices=["fixes", "simple-dep-updates", "both"],
-                       help="Type of mining to run: 'fixes' (PR-based bad->good), 'simple-dep-updates' (single-line dependency updates), or 'both' (default: fixes)")
+                       help="Type of mining to run (Step 1): 'fixes' (PR-based bad->good), 'simple-dep-updates' (single-line dependency updates), or 'both' (default: fixes)")
     parser.add_argument("--classifier", default="both", choices=["simple", "ai", "both"],
-                       help="Classification to run: 'simple' (heuristic), 'ai' (Gemini), or 'both' (default: both). Only applies to 'fixes' mining type.")
+                       help="Classification to run (Steps 2 and 2b): 'simple' (heuristic), 'ai' (Gemini), or 'both' (default: both). Runs on the mining results from Step 1.")
     
     args = parser.parse_args()
     

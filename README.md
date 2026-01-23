@@ -49,10 +49,14 @@ All mining scripts now use a **unified JSON format** to ensure consistency:
 
 ### 0. `run_pipeline.py` (The All-in-One)
 **Function**: Runs the entire pipeline (Mining -> Classification).
-- **Mining Types** (`--type`): 
+- **Mining Types** (`--type`): Controls Step 1
   - `fixes` (default): PR-based bad->good commit pairs
   - `simple-dep-updates`: Single-line dependency updates only
   - `both`: Runs both mining types
+- **Classification Options** (`--classifier`): Controls Steps 2 and 2b, runs on the results from Step 1
+  - `simple`: Heuristic classification only (fast)
+  - `ai`: AI classification with Gemini (requires simple as prerequisite)
+  - `both` (default): Runs both simple and AI classification
 - **Limit Options**:
   - `--search-limit`: Maximum number of PRs/commits to search through (stops after searching this many items)
   - `--results-limit`: Maximum number of valid results to find (stops after finding this many valid pairs/updates)
@@ -63,10 +67,6 @@ All mining scripts now use a **unified JSON format** to ensure consistency:
   - If a repository exceeds the timeout, it is skipped and processing continues with the next repository
   - Prevents individual repositories from hanging indefinitely
   - Example: `--timeout 300` for 5-minute timeout
-- **Classification Options** (`--classifier`): Only applies to `fixes` mining type
-  - `simple`: Heuristic classification only (fast)
-  - `ai`: AI classification with Gemini (requires simple as prerequisite)
-  - `both` (default): Runs both simple and AI classification
 - **Clean Option** (`--clean`):
   - Deletes entire `results/` and `state/` directories before running
   - Useful for starting fresh or after changing mining parameters
@@ -91,8 +91,11 @@ All mining scripts now use a **unified JSON format** to ensure consistency:
   # Run only simple classification
   python3 run_pipeline.py android/nowinandroid --search-limit 100 --type fixes --classifier simple
   
-  # Run simple-dep-updates mining (no classification)
-  python3 run_pipeline.py android/nowinandroid --results-limit 100 --type simple-dep-updates
+  # Run simple-dep-updates mining with both classifiers
+  python3 run_pipeline.py android/nowinandroid --results-limit 100 --type simple-dep-updates --classifier both
+  
+  # Run simple-dep-updates with only AI classification
+  python3 run_pipeline.py android/nowinandroid --results-limit 100 --type simple-dep-updates --classifier ai
   ```
 - **Usage (Multi-Repo)**:
   Create a file `repos.txt` with one repo per line, then:
