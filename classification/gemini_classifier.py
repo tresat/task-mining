@@ -75,7 +75,7 @@ class GeminiClassifier:
             return {"sub_category": "Unknown (No Diff)", "error": None}
         
         if not self.categories:
-            return {"sub_category": None, "error": "No categories loaded"}
+            return {"sub_category": "Other", "error": "No categories loaded"}
         
         # Build category descriptions dynamically
         category_descriptions = []
@@ -114,8 +114,13 @@ class GeminiClassifier:
                     for category_name in self.categories.keys():
                         if category_name in answer:
                             return {"sub_category": category_name, "error": None}
-                    # If no match, return Other as fallback
-                    return {"sub_category": "Other", "error": None}
+                    # If no match, return Other as fallback (or first category if Other doesn't exist)
+                    if "Other" in self.categories:
+                        return {"sub_category": "Other", "error": None}
+                    elif self.categories:
+                        return {"sub_category": list(self.categories.keys())[0], "error": None}
+                    else:
+                        return {"sub_category": "Unknown", "error": None}
                 except (KeyError, IndexError) as e:
                     error_msg = f"Error parsing Gemini response: {e}"
                     print(error_msg)

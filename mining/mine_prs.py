@@ -153,6 +153,16 @@ class PRMiner:
             return state in ["FAILURE", "ERROR"]
             
         return False
+    
+    def _build_pr_description(self, pr_data: Dict[str, Any]) -> str:
+        """Builds a PR description from title and body."""
+        pr_title = pr_data.get("title", "")
+        pr_body = pr_data.get("body", "")
+        
+        if pr_body:
+            return f"{pr_title}\n\n{pr_body}"
+        else:
+            return pr_title
 
     def get_all_commits_for_pr(self, pr_node: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Fetches all commits for a PR, handling pagination if > 100."""
@@ -248,14 +258,7 @@ class PRMiner:
                 
                 pr_data = cached_prs[str(pr_number)]
                 commits = pr_data["commits"]["nodes"]
-                pr_title = pr_data.get("title", "")
-                pr_body = pr_data.get("body", "")
-                
-                # Build PR description
-                if pr_body:
-                    pr_description = f"{pr_title}\n\n{pr_body}"
-                else:
-                    pr_description = pr_title
+                pr_description = self._build_pr_description(pr_data)
                 
                 last_bad_commit = None
                 
@@ -367,15 +370,8 @@ class PRMiner:
                     return results
                 
                 pr_number = pr["number"]
-                pr_title = pr.get("title", "")
-                pr_body = pr.get("body", "")
                 commits = self.get_all_commits_for_pr(pr)
-                
-                # Build PR description
-                if pr_body:
-                    pr_description = f"{pr_title}\n\n{pr_body}"
-                else:
-                    pr_description = pr_title
+                pr_description = self._build_pr_description(pr)
                 
                 last_bad_commit = None
                 
