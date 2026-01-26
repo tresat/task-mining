@@ -44,11 +44,9 @@ class TestClassificationCacheManager(unittest.TestCase):
         """Set up test fixtures."""
         # Create a temporary directory for cache
         self.temp_dir = tempfile.mkdtemp()
-        self.original_cache_dir = os.path.join(".cache", "agents")
-        
-        # Patch the cache directory
-        self.test_cache_dir = os.path.join(self.temp_dir, "agents")
-        os.makedirs(self.test_cache_dir, exist_ok=True)
+        self.test_owner = "test_owner"
+        self.test_repo = "test_repo"
+        self.test_cache_dir = os.path.join(self.temp_dir, "agents", f"{self.test_owner}_{self.test_repo}")
     
     def tearDown(self):
         """Clean up test fixtures."""
@@ -58,125 +56,131 @@ class TestClassificationCacheManager(unittest.TestCase):
     
     def test_cache_manager_initialization(self):
         """Test cache manager initialization."""
-        # Temporarily patch the cache directory
-        import classification.classification_cache as cache_module
-        original_cache_dir = cache_module.ClassificationCacheManager.__init__
-        
-        # Create manager with test cache directory
-        manager = ClassificationCacheManager("test_classifier")
+        manager = ClassificationCacheManager("test_classifier", self.test_owner, self.test_repo)
         manager.cache_dir = self.test_cache_dir
         manager.cache_file = os.path.join(self.test_cache_dir, "test_classifier.json")
         
         self.assertEqual(manager.classifier_type, "test_classifier")
+        self.assertEqual(manager.repo_owner, self.test_owner)
+        self.assertEqual(manager.repo_name, self.test_repo)
         self.assertIsInstance(manager._cache, dict)
+        self.assertIn("classification_hash", manager._cache)
+        self.assertIn("classifications", manager._cache)
     
-    def test_set_and_get_cached_hash(self):
-        """Test setting and getting cached hash."""
-        manager = ClassificationCacheManager("test")
+    def test_check_and_update_hash(self):
+        """Test checking and updating hash."""
+        manager = ClassificationCacheManager("test", self.test_owner, self.test_repo)
         manager.cache_dir = self.test_cache_dir
         manager.cache_file = os.path.join(self.test_cache_dir, "test.json")
         
         test_hash = "abc123def456"
+        
+        # First time - hash should be updated
+        changed = manager.check_and_update_hash(test_hash)
+        self.assertTrue(changed)
+        self.assertEqual(manager._cache["classification_hash"], test_hash)
+        
+        # Second time with same hash - no change
+        changed = manager.check_and_update_hash(test_hash)
+        self.assertFalse(changed)
+        
+        # Different hash - should change
+        new_hash = "different_hash"
+        changed = manager.check_and_update_hash(new_hash)
+        self.assertTrue(changed)
+        self.assertEqual(manager._cache["classification_hash"], new_hash)
+        # Classifications should be cleared
+        self.assertEqual(len(manager._cache["classifications"]), 0)
+    
+    def test_set_and_get_cached_result(self):
+        """Test setting and getting cached results."""
+        manager = ClassificationCacheManager("test", self.test_owner, self.test_repo)
+        manager.cache_dir = self.test_cache_dir
+        manager.cache_file = os.path.join(self.test_cache_dir, "test.json")
+        
         test_item_id = "test_pr_123"
+        test_category = "Feature"
+        test_tags = ["documentation", "tests"]
+        test_error = None
         
         # Initially, should return None
-        self.assertIsNone(manager.get_cached_hash(test_item_id))
+        self.assertIsNone(manager.get_cached_result(test_item_id))
         
-        # Set the hash
-        manager.set_cached_hash(test_item_id, test_hash)
+        # Set the result
+        manager.set_cached_result(test_item_id, test_category, test_tags, test_error)
         
-        # Now should return the hash
-        self.assertEqual(manager.get_cached_hash(test_item_id), test_hash)
-    
-    def test_needs_classification_no_cache(self):
-        """Test needs_classification when item is not cached."""
-        manager = ClassificationCacheManager("test")
-        manager.cache_dir = self.test_cache_dir
-        manager.cache_file = os.path.join(self.test_cache_dir, "test.json")
-        
-        # Should need classification when not cached
-        self.assertTrue(manager.needs_classification("item1", "hash1"))
-    
-    def test_needs_classification_cached_same_hash(self):
-        """Test needs_classification when cached with same hash."""
-        manager = ClassificationCacheManager("test")
-        manager.cache_dir = self.test_cache_dir
-        manager.cache_file = os.path.join(self.test_cache_dir, "test.json")
-        
-        test_hash = "hash1"
-        test_item = "item1"
-        
-        # Cache the item
-        manager.set_cached_hash(test_item, test_hash)
-        
-        # Should not need classification with same hash
-        self.assertFalse(manager.needs_classification(test_item, test_hash))
-    
-    def test_needs_classification_cached_different_hash(self):
-        """Test needs_classification when cached with different hash."""
-        manager = ClassificationCacheManager("test")
-        manager.cache_dir = self.test_cache_dir
-        manager.cache_file = os.path.join(self.test_cache_dir, "test.json")
-        
-        old_hash = "hash1"
-        new_hash = "hash2"
-        test_item = "item1"
-        
-        # Cache the item with old hash
-        manager.set_cached_hash(test_item, old_hash)
-        
-        # Should need classification with different hash
-        self.assertTrue(manager.needs_classification(test_item, new_hash))
-    
-    def test_needs_classification_with_reclassify_flag(self):
-        """Test needs_classification with reclassify=True."""
-        manager = ClassificationCacheManager("test")
-        manager.cache_dir = self.test_cache_dir
-        manager.cache_file = os.path.join(self.test_cache_dir, "test.json")
-        
-        test_hash = "hash1"
-        test_item = "item1"
-        
-        # Cache the item
-        manager.set_cached_hash(test_item, test_hash)
-        
-        # Should need classification when reclassify=True
-        self.assertTrue(manager.needs_classification(test_item, test_hash, reclassify=True))
+        # Now should return the result
+        result = manager.get_cached_result(test_item_id)
+        self.assertIsNotNone(result)
+        self.assertEqual(result["category"], test_category)
+        self.assertEqual(result["tags"], test_tags)
+        self.assertEqual(result["error"], test_error)
     
     def test_cache_persistence(self):
         """Test that cache is persisted to disk."""
         cache_file = os.path.join(self.test_cache_dir, "test.json")
         
         # Create manager and add item
-        manager1 = ClassificationCacheManager("test")
+        manager1 = ClassificationCacheManager("test", self.test_owner, self.test_repo)
         manager1.cache_dir = self.test_cache_dir
         manager1.cache_file = cache_file
-        manager1.set_cached_hash("item1", "hash1")
+        manager1.set_cached_result("item1", "Bug Fix", ["tests"], None)
         
         # Create new manager and verify it loads the cache
-        manager2 = ClassificationCacheManager("test")
+        manager2 = ClassificationCacheManager("test", self.test_owner, self.test_repo)
         manager2.cache_dir = self.test_cache_dir
         manager2.cache_file = cache_file
         manager2._load_cache()
         
-        self.assertEqual(manager2.get_cached_hash("item1"), "hash1")
+        result = manager2.get_cached_result("item1")
+        self.assertIsNotNone(result)
+        self.assertEqual(result["category"], "Bug Fix")
+        self.assertEqual(result["tags"], ["tests"])
     
     def test_clear_cache(self):
         """Test clearing the cache."""
-        manager = ClassificationCacheManager("test")
+        manager = ClassificationCacheManager("test", self.test_owner, self.test_repo)
         manager.cache_dir = self.test_cache_dir
         manager.cache_file = os.path.join(self.test_cache_dir, "test.json")
         
-        # Add some items
-        manager.set_cached_hash("item1", "hash1")
-        manager.set_cached_hash("item2", "hash2")
+        # Add some items and set hash
+        test_hash = "abc123"
+        manager.check_and_update_hash(test_hash)
+        manager.set_cached_result("item1", "Feature", [], None)
+        manager.set_cached_result("item2", "Bug Fix", [], None)
         
         # Clear cache
         manager.clear_cache()
         
-        # Verify cache is empty
-        self.assertIsNone(manager.get_cached_hash("item1"))
-        self.assertIsNone(manager.get_cached_hash("item2"))
+        # Verify classifications are empty but hash remains
+        self.assertIsNone(manager.get_cached_result("item1"))
+        self.assertIsNone(manager.get_cached_result("item2"))
+        self.assertEqual(manager._cache["classification_hash"], test_hash)
+    
+    def test_hash_change_clears_classifications(self):
+        """Test that changing hash clears all classifications."""
+        manager = ClassificationCacheManager("test", self.test_owner, self.test_repo)
+        manager.cache_dir = self.test_cache_dir
+        manager.cache_file = os.path.join(self.test_cache_dir, "test.json")
+        
+        # Set initial hash and add classifications
+        hash1 = "hash1"
+        manager.check_and_update_hash(hash1)
+        manager.set_cached_result("item1", "Feature", [], None)
+        manager.set_cached_result("item2", "Bug Fix", [], None)
+        
+        # Verify items exist
+        self.assertIsNotNone(manager.get_cached_result("item1"))
+        self.assertIsNotNone(manager.get_cached_result("item2"))
+        
+        # Change hash
+        hash2 = "hash2"
+        changed = manager.check_and_update_hash(hash2)
+        self.assertTrue(changed)
+        
+        # Verify classifications were cleared
+        self.assertIsNone(manager.get_cached_result("item1"))
+        self.assertIsNone(manager.get_cached_result("item2"))
 
 
 if __name__ == "__main__":

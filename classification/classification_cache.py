@@ -3,14 +3,14 @@ Classification cache management for avoiding redundant AI classifications.
 
 This module provides functionality to:
 1. Hash the contents of classification/categories and classification/tags directories
-2. Store classification hashes per PR/commit for each AI classifier type
-3. Check if a PR/commit needs reclassification based on hash changes
+2. Store classification results per PR/commit per repo for each AI classifier type
+3. Automatically invalidate cache when classification configuration changes
 """
 
 import os
 import hashlib
 import json
-from typing import Dict, Optional, Set
+from typing import Dict, Optional, Any
 
 
 def compute_classification_hash() -> str:
@@ -53,23 +53,44 @@ def compute_classification_hash() -> str:
 
 class ClassificationCacheManager:
     """
-    Manages classification cache for a specific AI classifier type.
+    Manages classification cache for a specific AI classifier type and repository.
     
-    Stores which PR IDs or commit hashes have been classified with
-    which classification configuration hash.
+    Cache structure:
+    {
+        "classification_hash": "abc123...",
+        "classifications": {
+            "item_id": {
+                "category": "Feature",
+                "tags": ["documentation"],
+                "error": null
+            }
+        }
+    }
     """
     
-    def __init__(self, classifier_type: str):
+    def __init__(self, classifier_type: str, repo_owner: str, repo_name: str):
         """
-        Initialize cache manager for a specific classifier type.
+        Initialize cache manager for a specific classifier type and repository.
         
         Args:
             classifier_type: Type of classifier (e.g., 'gemini', 'gpt', 'claude')
+            repo_owner: Repository owner
+            repo_name: Repository name
         """
         self.classifier_type = classifier_type
-        self.cache_dir = os.path.join(".cache", "agents")
+        self.repo_owner = repo_owner
+        self.repo_name = repo_name
+        self.repo_key = f"{repo_owner}_{repo_name}"
+        
+        # Cache directory per repo
+        self.cache_dir = os.path.join(".cache", "agents", self.repo_key)
         self.cache_file = os.path.join(self.cache_dir, f"{classifier_type}.json")
-        self._cache: Dict[str, str] = {}
+        
+        # Cache structure: {"classification_hash": str, "classifications": dict}
+        self._cache: Dict[str, Any] = {
+            "classification_hash": None,
+            "classifications": {}
+        }
         self._load_cache()
     
     def _load_cache(self):
@@ -78,11 +99,22 @@ class ClassificationCacheManager:
             try:
                 with open(self.cache_file, 'r') as f:
                     self._cache = json.load(f)
+                    # Ensure structure
+                    if "classification_hash" not in self._cache:
+                        self._cache["classification_hash"] = None
+                    if "classifications" not in self._cache:
+                        self._cache["classifications"] = {}
             except Exception as e:
                 print(f"Warning: Could not load classification cache for {self.classifier_type}: {e}")
-                self._cache = {}
+                self._cache = {
+                    "classification_hash": None,
+                    "classifications": {}
+                }
         else:
-            self._cache = {}
+            self._cache = {
+                "classification_hash": None,
+                "classifications": {}
+            }
     
     def _save_cache(self):
         """Save cache to disk."""
@@ -93,51 +125,58 @@ class ClassificationCacheManager:
         except Exception as e:
             print(f"Warning: Could not save classification cache for {self.classifier_type}: {e}")
     
-    def get_cached_hash(self, item_id: str) -> Optional[str]:
+    def check_and_update_hash(self, current_hash: str) -> bool:
         """
-        Get the classification hash for a specific item (PR ID or commit hash).
+        Check if classification hash has changed and update cache if needed.
+        If hash changed, clears all cached classifications.
+        
+        Args:
+            current_hash: Current classification configuration hash
+            
+        Returns:
+            True if hash changed (cache was cleared), False otherwise
+        """
+        cached_hash = self._cache.get("classification_hash")
+        
+        if cached_hash != current_hash:
+            # Hash changed, clear all classifications
+            self._cache["classification_hash"] = current_hash
+            self._cache["classifications"] = {}
+            self._save_cache()
+            return True
+        
+        return False
+    
+    def get_cached_result(self, item_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Get the cached classification result for a specific item.
         
         Args:
             item_id: PR ID or commit hash
             
         Returns:
-            Classification hash if cached, None otherwise
+            Classification result dict if cached, None otherwise
         """
-        return self._cache.get(item_id)
+        return self._cache["classifications"].get(item_id)
     
-    def set_cached_hash(self, item_id: str, classification_hash: str):
+    def set_cached_result(self, item_id: str, category: str, tags: list, error: Optional[str]):
         """
-        Store the classification hash for a specific item.
+        Store the classification result for a specific item.
         
         Args:
             item_id: PR ID or commit hash
-            classification_hash: Hash of classification configuration used
+            category: Classification category
+            tags: List of tags
+            error: Error message if classification failed, None otherwise
         """
-        self._cache[item_id] = classification_hash
+        self._cache["classifications"][item_id] = {
+            "category": category,
+            "tags": tags,
+            "error": error
+        }
         self._save_cache()
     
-    def needs_classification(self, item_id: str, current_hash: str, reclassify: bool = False) -> bool:
-        """
-        Check if an item needs (re)classification.
-        
-        Args:
-            item_id: PR ID or commit hash
-            current_hash: Current classification configuration hash
-            reclassify: If True, always classify regardless of cache
-            
-        Returns:
-            True if classification is needed, False otherwise
-        """
-        if reclassify:
-            return True
-        
-        cached_hash = self.get_cached_hash(item_id)
-        if cached_hash is None:
-            return True
-        
-        return cached_hash != current_hash
-    
     def clear_cache(self):
-        """Clear all cached classification hashes."""
-        self._cache = {}
+        """Clear all cached classifications but keep the hash."""
+        self._cache["classifications"] = {}
         self._save_cache()

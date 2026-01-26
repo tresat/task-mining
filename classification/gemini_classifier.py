@@ -16,7 +16,7 @@ class GeminiClassifier(BaseAIClassifier):
     def __init__(self, github_token: str, gemini_key: str, repo_owner: str, repo_name: str):
         super().__init__(github_token, gemini_key, repo_owner, repo_name)
         self.gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={gemini_key}"
-        self.cache_manager = ClassificationCacheManager("gemini")
+        self.cache_manager = ClassificationCacheManager("gemini", repo_owner, repo_name)
     
     def _call_ai_api(self, message: str, diff: str) -> dict:
         """Asks Gemini for categorization and tags using REST API.
@@ -178,94 +178,95 @@ class GeminiClassifier(BaseAIClassifier):
         # Compute current classification hash
         current_hash = compute_classification_hash()
         print(f"Current classification hash: {current_hash[:8]}...")
-            
-        # Track which commits have been processed with category
-        processed_commits = set()
-        for pair in pairs:
-            to_commit = pair.get("to_commit") or pair.get("good_commit")
-            category = pair.get("category")
-            if category is not None and category != "":
-                processed_commits.add(to_commit)
         
-        # Count how many need classification based on cache
-        items_to_classify = []
-        items_skipped = 0
+        # Check if hash changed and clear cache if needed
+        if not reclassify:
+            hash_changed = self.cache_manager.check_and_update_hash(current_hash)
+            if hash_changed:
+                print(f"Classification configuration changed - cache cleared for {self.owner}/{self.name}")
+        else:
+            # Force reclassification - clear cache
+            self.cache_manager.clear_cache()
+            print(f"Reclassification requested - cache cleared for {self.owner}/{self.name}")
         
-        for pair in pairs:
+        # Process each pair
+        classified_count = 0
+        skipped_count = 0
+        
+        for i, pair in enumerate(pairs):
             to_commit = pair.get("to_commit") or pair.get("good_commit")
             pr_id = pair.get("pr_id")
             
             # Use PR ID if available, otherwise use commit hash as identifier
             item_id = str(pr_id) if pr_id else to_commit
             
-            # Skip if already has category and cache says no reclassification needed
-            if to_commit in processed_commits:
-                if not self.cache_manager.needs_classification(item_id, current_hash, reclassify):
-                    items_skipped += 1
-                    continue
+            # Check cache for existing result
+            cached_result = self.cache_manager.get_cached_result(item_id)
             
-            items_to_classify.append((item_id, pair))
-        
-        if items_skipped > 0:
-            print(f"Skipping classification for {items_skipped} items (no changes to classification configuration)")
+            if cached_result is not None and not reclassify:
+                # Use cached result
+                pair["category"] = cached_result["category"]
+                pair["tags"] = cached_result["tags"]
+                pair["error"] = cached_result["error"]
+                skipped_count += 1
+            else:
+                # Classify the item
+                msg = pair.get("to_msg") or pair.get("good_msg")
                 
-        print(f"Found {len(processed_commits)} already classified pairs.")
-        print(f"Classifying {len(items_to_classify)} pairs with Gemini...")
+                print(f"[{classified_count + 1}] Fetching diff for {to_commit[:7]}...")
+                diff = self.get_commit_diff(to_commit)
+                
+                print(f"  Asking Gemini...")
+                result = self._call_ai_api(msg, diff)
+                category = result["category"]
+                ai_tags = result["tags"]
+                error = result["error"]
+                
+                print(f"  Assigned Category: {category}")
+                
+                # Set category
+                pair["category"] = category
+                
+                # Initialize tags if not present
+                if "tags" not in pair or pair["tags"] is None:
+                    pair["tags"] = []
+                else:
+                    pair["tags"] = list(pair["tags"])  # Ensure it's a list
+                
+                # Add AI tags
+                for tag in ai_tags:
+                    if tag not in pair["tags"]:
+                        pair["tags"].append(tag)
+                
+                # Check for single-line changes and add "one-line" tag if applicable
+                if diff:
+                    lines = diff.split('\n')
+                    additions = sum(1 for line in lines if line.startswith('+') and not line.startswith('+++'))
+                    deletions = sum(1 for line in lines if line.startswith('-') and not line.startswith('---'))
+                    if additions == 1 and deletions == 1:
+                        if "one-line" not in pair["tags"]:
+                            pair["tags"].append("one-line")
+                
+                print(f"  Assigned Tags: {', '.join(pair['tags'])}")
+                
+                pair["error"] = error
+                classified_count += 1
+                
+                # Store result in cache
+                self.cache_manager.set_cached_result(item_id, pair["category"], pair["tags"], pair["error"])
+                
+                # Save incrementally every 5 items
+                if classified_count % 5 == 0:
+                    with open(input_file, 'w') as f:
+                        json.dump(pairs, f, indent=2)
+                    print(f"  [Saved progress to {input_file}]")
+                
+                time.sleep(1)
         
-        new_count = 0
+        if skipped_count > 0:
+            print(f"Skipped classification for {skipped_count} items (found in cache)")
         
-        for i, (item_id, pair) in enumerate(items_to_classify):
-            to_commit = pair.get("to_commit") or pair.get("good_commit")
-            msg = pair.get("to_msg") or pair.get("good_msg")
-            
-            print(f"[{i+1}/{len(items_to_classify)}] Fetching diff for {to_commit[:7]}...")
-            diff = self.get_commit_diff(to_commit)
-            
-            print(f"  Asking Gemini...")
-            result = self._call_ai_api(msg, diff)
-            category = result["category"]
-            ai_tags = result["tags"]
-            error = result["error"]
-            
-            print(f"  Assigned Category: {category}")
-            
-            # Set category
-            pair["category"] = category
-            
-            # Initialize tags if not present
-            if "tags" not in pair or pair["tags"] is None:
-                pair["tags"] = []
-            
-            # Add AI tags
-            for tag in ai_tags:
-                if tag not in pair["tags"]:
-                    pair["tags"].append(tag)
-            
-            # Check for single-line changes and add "one-line" tag if applicable
-            if diff:
-                lines = diff.split('\n')
-                additions = sum(1 for line in lines if line.startswith('+') and not line.startswith('+++'))
-                deletions = sum(1 for line in lines if line.startswith('-') and not line.startswith('---'))
-                if additions == 1 and deletions == 1:
-                    if "one-line" not in pair["tags"]:
-                        pair["tags"].append("one-line")
-            
-            print(f"  Assigned Tags: {', '.join(pair['tags'])}")
-            
-            pair["error"] = error
-            processed_commits.add(to_commit)
-            new_count += 1
-            
-            # Update cache with current hash for this item
-            self.cache_manager.set_cached_hash(item_id, current_hash)
-            
-            # Save incrementally every 5 items
-            if new_count % 5 == 0:
-                with open(input_file, 'w') as f:
-                    json.dump(pairs, f, indent=2)
-                print(f"  [Saved progress to {input_file}]")
-            
-            time.sleep(1)
+        print(f"Classified {classified_count} items with Gemini")
             
         # Final save
         with open(input_file, 'w') as f:
