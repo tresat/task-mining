@@ -74,7 +74,7 @@ def prime_cache_for_repo(repo, mining_type):
         prime_commit_cache(miner, cache_manager, ref, max_items=MAX_CACHE_ITEMS_COMMITS)
 
 
-def run_mining(repo, search_limit, results_limit, mining_type, output_dir, state_dir):
+def run_mining(repo, search_limit, results_limit, mining_type, output_dir, state_dir, allow_missing_status=False):
     """
     Run mining based on the specified type.
     
@@ -99,6 +99,10 @@ def run_mining(repo, search_limit, results_limit, mining_type, output_dir, state
         limit_args.extend(["--search-limit", str(search_limit)])
     if results_limit:
         limit_args.extend(["--results-limit", str(results_limit)])
+    
+    # Add allow-missing-status flag if enabled
+    if allow_missing_status:
+        limit_args.append("--allow-missing-status")
     
     # Mine based on type (no header output)
     classification_input = None
@@ -200,7 +204,7 @@ def run_classification(repo, classifier, classification_input, reclassify=False)
             f"Running Claude Classification for {repo}"
         )
 
-def process_repo(repo, search_limit, results_limit, mining_type, classifier, timeout_seconds, reclassify):
+def process_repo(repo, search_limit, results_limit, mining_type, classifier, timeout_seconds, reclassify, allow_missing_status):
     print(f"\n*** PROCESSING REPO: {repo} ***")
     
     if "/" not in repo:
@@ -214,7 +218,7 @@ def process_repo(repo, search_limit, results_limit, mining_type, classifier, tim
     os.makedirs(state_dir, exist_ok=True)
     
     # Mining
-    classification_input = run_mining(repo, search_limit, results_limit, mining_type, output_dir, state_dir)
+    classification_input = run_mining(repo, search_limit, results_limit, mining_type, output_dir, state_dir, allow_missing_status)
     
     # Classification
     run_classification(repo, classifier, classification_input, reclassify)
@@ -330,6 +334,9 @@ def main():
                        help="Type of mining to run (Step 1): 'prs' (PR-based bad->good) or 'commits' (commit-based pairs with successful builds). Default: prs")
     parser.add_argument("--classifier", default="simple", choices=["simple", "gemini", "gpt", "claude"],
                        help="Classification to run (Steps 2 and 2b): 'simple' (heuristic), 'gemini' (Google Gemini), 'gpt' (OpenAI GPT), or 'claude' (Anthropic Claude). AI classifiers automatically run simple as prerequisite. Runs on the mining results from Step 1. Default: simple")
+    parser.add_argument("--allow-missing-status", action="store_true",
+                       help="Allow commits without status checks (only for --type commits). Useful for repositories without CI/CD configured. "
+                            "Without this flag, only commits with verified successful builds are included.")
     
     args = parser.parse_args()
     
@@ -406,7 +413,7 @@ def main():
     for repo in repos:
         try:
             with timeout_context(args.timeout, repo):
-                process_repo(repo, args.search_limit, args.results_limit, args.type, args.classifier, args.timeout, args.reclassify)
+                process_repo(repo, args.search_limit, args.results_limit, args.type, args.classifier, args.timeout, args.reclassify, args.allow_missing_status)
         except TimeoutError as e:
             print(f"\n{'!'*60}")
             print(f"TIMEOUT: {e}")

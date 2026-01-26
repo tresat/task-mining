@@ -26,9 +26,25 @@ class TestCommitMiner(unittest.TestCase):
         commit = {"statusCheckRollup": {"state": "FAILURE"}}
         self.assertFalse(self.miner.is_build_successful(commit))
 
-        # Case 4: No status
+        # Case 4: No status - should fail by default
         commit = {}
         self.assertFalse(self.miner.is_build_successful(commit))
+    
+    def test_is_build_successful_with_allow_missing_status(self):
+        # Create miner with allow_missing_status=True
+        miner_with_flag = CommitMiner("fake_token", "owner", "repo", allow_missing_status=True)
+        
+        # Case 1: StatusCheckRollup says SUCCESS - should still succeed
+        commit = {"statusCheckRollup": {"state": "SUCCESS"}}
+        self.assertTrue(miner_with_flag.is_build_successful(commit))
+        
+        # Case 2: StatusCheckRollup says FAILURE - should still fail
+        commit = {"statusCheckRollup": {"state": "FAILURE"}}
+        self.assertFalse(miner_with_flag.is_build_successful(commit))
+        
+        # Case 3: No status - should succeed when flag is enabled
+        commit = {}
+        self.assertTrue(miner_with_flag.is_build_successful(commit))
 
     @patch('mining.mine_commits.CommitMiner._query')
     def test_get_default_branch_main_exists(self, mock_query):
@@ -70,10 +86,10 @@ class TestProcessRepo(unittest.TestCase):
         mock_miner_class.return_value = mock_miner
         
         with tempfile.TemporaryDirectory() as tmpdir:
-            process_repo("owner/repo", "fake_token", 100, None, tmpdir, tmpdir, None)
+            process_repo("owner/repo", "fake_token", 100, None, tmpdir, tmpdir, None, use_cache=True, allow_missing_status=False)
             
-            # Verify miner was created with correct parameters
-            mock_miner_class.assert_called_once_with("fake_token", "owner", "repo")
+            # Verify miner was created with correct parameters (including allow_missing_status)
+            mock_miner_class.assert_called_once_with("fake_token", "owner", "repo", False)
             
             # Verify get_default_branch was called
             mock_miner.get_default_branch.assert_called_once()
