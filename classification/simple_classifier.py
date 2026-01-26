@@ -303,9 +303,8 @@ class SimpleClassifier(BaseClassifier):
             if "one-line" not in tags:
                 tags.append("one-line")
             
-            # Check for version increase
-            patch = file_info.get("patch", "")
-            version_change = self.extract_version_change(patch)
+            # Check for version increase using the check_version_update method
+            version_change = self.check_version_update(pair, file_info)
             if version_change:
                 if "version-update" not in tags:
                     tags.append("version-update")
