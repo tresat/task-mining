@@ -73,13 +73,19 @@ class BaseAIClassifier(BaseClassifier):
         
         This is a concrete method shared by all AI classifiers.
         """
+        # Validate commit_sha to prevent path traversal attacks
+        # Git commit SHAs are 40 hexadecimal characters (or 7+ for short form)
+        if not commit_sha or not all(c in '0123456789abcdefABCDEF' for c in commit_sha):
+            print(f"Invalid commit SHA format: {commit_sha}")
+            return ""
+        
         # Define cache path
         cache_file = os.path.join(COMMIT_DIFF_CACHE_DIR, f"{commit_sha}.txt")
         
         # Check if diff exists in cache
         if os.path.exists(cache_file):
             try:
-                with open(cache_file, 'r') as f:
+                with open(cache_file, 'r', encoding='utf-8') as f:
                     diff_content = f.read()
                 print(f"Using cached diff for {commit_sha}")
                 return diff_content
@@ -101,7 +107,7 @@ class BaseAIClassifier(BaseClassifier):
                 # Save to cache
                 try:
                     os.makedirs(COMMIT_DIFF_CACHE_DIR, exist_ok=True)
-                    with open(cache_file, 'w') as f:
+                    with open(cache_file, 'w', encoding='utf-8') as f:
                         f.write(diff_content)
                     print(f"Cached diff for {commit_sha}")
                 except Exception as e:
