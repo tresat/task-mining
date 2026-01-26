@@ -32,7 +32,8 @@ class TestBaseClassifier(unittest.TestCase):
  [versions]
 -androidxCore = "1.9.0"
 +androidxCore = "1.10.0"
- androidxCompose = "1.5.0\""""
+ androidxCompose = "1.5.0"
+"""
             }]
         }
         result = self.classifier.is_single_line_change(commit_diff)
@@ -49,7 +50,8 @@ class TestBaseClassifier(unittest.TestCase):
 -androidxCore = "1.9.0"
 -androidxCompose = "1.5.0"
 +androidxCore = "1.10.0"
-+androidxCompose = "1.6.0\""""
++androidxCompose = "1.6.0"
+"""
             }]
         }
         result = self.classifier.is_single_line_change(commit_diff)
@@ -64,14 +66,16 @@ class TestBaseClassifier(unittest.TestCase):
                     "patch": """@@ -1,3 +1,3 @@
  [versions]
 -androidxCore = "1.9.0"
-+androidxCore = "1.10.0\""""
++androidxCore = "1.10.0"
+"""
                 },
                 {
                     "filename": "build.gradle",
                     "patch": """@@ -1,3 +1,3 @@
  dependencies {
 -    implementation "androidx.core:core:1.9.0"
-+    implementation "androidx.core:core:1.10.0\""""
++    implementation "androidx.core:core:1.10.0"
+"""
                 }
             ]
         }
@@ -112,7 +116,8 @@ class TestBaseClassifier(unittest.TestCase):
                 "patch": """@@ -1,2 +1,3 @@
  [versions]
  androidxCore = "1.9.0"
-+androidxCompose = "1.5.0\""""
++androidxCompose = "1.5.0"
+"""
             }]
         }
         result = self.classifier.is_single_line_change(commit_diff)
