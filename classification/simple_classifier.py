@@ -292,21 +292,21 @@ class SimpleClassifier:
             if "one-line" not in tags:
                 tags.append("one-line")
             
-            # Check for version increase
-            patch = file_info.get("patch", "")
-            version_change = self.extract_version_change(patch)
-            if version_change:
-                if "version-update" not in tags:
-                    tags.append("version-update")
+        # Check for version increase
+        patch = file_info.get("patch", "")
+        version_change = self.extract_version_change(patch)
+        if version_change:
+            if "version-update" not in tags:
+                tags.append("version-update")
                 
-                # Populate files_changed if empty
-                if not pair.get("files_changed"):
-                    pair["files_changed"] = [{
-                        "filename": file_info.get("filename"),
-                        "line_number": version_change["line_number"],
-                        "from_line_contents": version_change["from_line"],
-                        "to_line_contents": version_change["to_line"]
-                    }]
+        # Populate files_changed if empty
+        if not pair.get("files_changed"):
+            pair["files_changed"] = [{
+                "filename": file_info.get("filename"),
+                "line_number": version_change["line_number"],
+                "from_line_contents": version_change["from_line"],
+                "to_line_contents": version_change["to_line"]
+            }]
         
         for file_obj in files:
             filename = file_obj.get("filename", "")
