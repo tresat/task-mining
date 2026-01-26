@@ -23,13 +23,7 @@ def timeout_context(seconds, repo_name):
         signal.alarm(0)
         signal.signal(signal.SIGALRM, old_handler)
 
-def run_step(command, description, show_header=True):
-    if show_header:
-        print(f"\n{'='*60}")
-        print(f"STEP: {description}")
-        print(f"CMD: {' '.join(command)}")
-        print(f"{'='*60}")
-    
+def run_step(command, description):
     try:
         subprocess.run(command, check=True)
     except subprocess.CalledProcessError as e:
@@ -111,15 +105,13 @@ def run_mining(repo, search_limit, results_limit, mining_type, output_dir, state
     if mining_type == "prs":
         run_step(
             ["python3", "-m", "mining.mine_prs", repo] + limit_args + ["--output", "results", "--state", state_dir],
-            f"Step 1: Mining 'Bad -> Good' Pairs for {repo}",
-            show_header=False
+            f"Step 1: Mining 'Bad -> Good' Pairs for {repo}"
         )
         classification_input = per_repo_output
     elif mining_type == "commits":
         run_step(
             ["python3", "-m", "mining.mine_commits", repo] + limit_args + ["--output", "results", "--state", state_dir],
-            f"Step 1: Mining Commit Pairs for {repo}",
-            show_header=False
+            f"Step 1: Mining Commit Pairs for {repo}"
         )
         classification_input = per_repo_output
     
@@ -168,8 +160,7 @@ def run_classification(repo, classifier, classification_input, reclassify=False)
     if classifier == "simple":
         run_step(
             ["python3", "-m", "classification.simple_classifier", repo, "--input", classification_input],
-            f"Running Simple Classifier for {repo}",
-            show_header=False
+            f"Running Simple Classifier for {repo}"
         )
     
     # Gemini Classification (runs on any mining type)
@@ -177,13 +168,11 @@ def run_classification(repo, classifier, classification_input, reclassify=False)
         # AI classifier needs analyzed results, so run simple first as prerequisite
         run_step(
             ["python3", "-m", "classification.simple_classifier", repo, "--input", classification_input],
-            f"Running Simple Classifier for {repo} (prerequisite for Gemini)",
-            show_header=False
+            f"Running Simple Classifier for {repo} (prerequisite for Gemini)"
         )
         run_step(
             ["python3", "-m", "classification.gemini_classifier", repo, "--input", classification_input],
-            f"Running Gemini Classification for {repo}",
-            show_header=False
+            f"Running Gemini Classification for {repo}"
         )
     
     # GPT Classification (runs on any mining type)
@@ -191,13 +180,11 @@ def run_classification(repo, classifier, classification_input, reclassify=False)
         # GPT classifier needs analyzed results, so run simple first as prerequisite
         run_step(
             ["python3", "-m", "classification.simple_classifier", repo, "--input", classification_input],
-            f"Running Simple Classifier for {repo} (prerequisite for GPT)",
-            show_header=False
+            f"Running Simple Classifier for {repo} (prerequisite for GPT)"
         )
         run_step(
             ["python3", "-m", "classification.gpt_classifier", repo, "--input", classification_input],
-            f"Running GPT Classification for {repo}",
-            show_header=False
+            f"Running GPT Classification for {repo}"
         )
 
 def process_repo(repo, search_limit, results_limit, mining_type, classifier, timeout_seconds, reclassify):
@@ -337,8 +324,16 @@ def main():
     
     # Clean cache if requested (done first, before anything else)
     if args.clean_cache:
+        import shutil
         from mining.cache import CacheManager
         CacheManager.clear_all_caches()
+        
+        # Also clean commit diff cache
+        commit_cache_dir = os.path.join(".cache", "commit_contents")
+        if os.path.exists(commit_cache_dir):
+            print(f"Cleaning {commit_cache_dir}/ directory...")
+            shutil.rmtree(commit_cache_dir)
+            print(f"Removed {commit_cache_dir}/")
     
     # Clean entire results and state directories if requested (done first, before processing any repos)
     if args.clean:

@@ -62,8 +62,27 @@ class BaseAIClassifier(BaseClassifier):
         """
         Fetches the diff of a commit from GitHub.
         
+        This method uses caching to avoid redundant API calls.
+        Cache location: .cache/commit_contents/{commit_sha}.txt
+        
         This is a concrete method shared by all AI classifiers.
         """
+        # Define cache path
+        cache_dir = os.path.join(".cache", "commit_contents")
+        cache_file = os.path.join(cache_dir, f"{commit_sha}.txt")
+        
+        # Check if diff exists in cache
+        if os.path.exists(cache_file):
+            try:
+                with open(cache_file, 'r') as f:
+                    diff_content = f.read()
+                print(f"Using cached diff for {commit_sha}")
+                return diff_content
+            except Exception as e:
+                print(f"Error reading cached diff for {commit_sha}: {e}")
+                # Fall through to fetch from API
+        
+        # Fetch from GitHub API
         url = f"https://api.github.com/repos/{self.owner}/{self.name}/commits/{commit_sha}"
         headers = {
             "Authorization": f"Bearer {self.token}",
@@ -72,7 +91,18 @@ class BaseAIClassifier(BaseClassifier):
         try:
             response = requests.get(url, headers=headers, timeout=15)
             if response.status_code == 200:
-                return response.text[:10000]  # Truncate
+                diff_content = response.text[:10000]  # Truncate
+                
+                # Save to cache
+                try:
+                    os.makedirs(cache_dir, exist_ok=True)
+                    with open(cache_file, 'w') as f:
+                        f.write(diff_content)
+                    print(f"Cached diff for {commit_sha}")
+                except Exception as e:
+                    print(f"Warning: Could not cache diff for {commit_sha}: {e}")
+                
+                return diff_content
             else:
                 print(f"Failed to fetch diff for {commit_sha}: {response.status_code}")
                 return ""
