@@ -7,6 +7,9 @@ This project mines GitHub repositories for "Self-Correction" pairs (Bad Commit -
 1.  **Install Dependencies**:
     ```bash
     pip install requests
+    pip install google-generativeai  # Only needed for --classifier gemini
+    pip install openai               # Only needed for --classifier gpt
+    pip install anthropic            # Only needed for --classifier claude
     ```
 2.  **Environment Variables**:
     Create a `.env` file:
