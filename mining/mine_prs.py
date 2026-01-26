@@ -239,8 +239,17 @@ class PRMiner:
         
         # If using cache, try to mine from cache first
         if cache_manager:
-            print(f"\nMining from cache ({cache_manager.size()} PRs available)...")
+            cache_size = cache_manager.size()
+            print(f"\nMining from cache ({cache_size} PRs available)...")
             cached_prs = cache_manager.get_all()
+            
+            # If cache is large and no search_limit set, apply a reasonable limit
+            # to avoid processing thousands of PRs
+            effective_search_limit = search_limit
+            if not search_limit and results_limit and cache_size > 200:
+                # Process up to 10x the results_limit from cache
+                effective_search_limit = results_limit * 10
+                print(f"Large cache detected. Will process up to {effective_search_limit} PRs from cache.")
             
             # Sort PR numbers to process in order
             pr_numbers = sorted([int(k) for k in cached_prs.keys()], reverse=True)
@@ -251,9 +260,9 @@ class PRMiner:
                     print(f"Reached results limit of {results_limit} pairs.")
                     return results
                 
-                # Check search limit
-                if search_limit and processed_count >= search_limit:
-                    print(f"Reached search limit of {search_limit} PRs.")
+                # Check search limit (including effective limit)
+                if effective_search_limit and processed_count >= effective_search_limit:
+                    print(f"Reached search limit of {effective_search_limit} PRs.")
                     return results
                 
                 pr_data = cached_prs[str(pr_number)]
