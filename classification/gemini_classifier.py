@@ -10,11 +10,13 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 from mining.mine_common import load_env
 from classification.base_ai_classifier import BaseAIClassifier
+from classification.classification_cache import ClassificationCacheManager, compute_classification_hash
 
 class GeminiClassifier(BaseAIClassifier):
     def __init__(self, github_token: str, gemini_key: str, repo_owner: str, repo_name: str):
         super().__init__(github_token, gemini_key, repo_owner, repo_name)
         self.gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={gemini_key}"
+        self.cache_manager = ClassificationCacheManager("gemini")
     
     def _call_ai_api(self, message: str, diff: str) -> dict:
         """Asks Gemini for categorization and tags using REST API.
@@ -159,14 +161,23 @@ class GeminiClassifier(BaseAIClassifier):
         
         return pair
 
-    def run(self, input_file: str):
-        """Classifies pairs in-place, updating the category and tags fields."""
+    def run(self, input_file: str, reclassify: bool = False):
+        """Classifies pairs in-place, updating the category and tags fields.
+        
+        Args:
+            input_file: Path to the JSON file containing pairs to classify
+            reclassify: If True, ignore cache and reclassify all items
+        """
         if not os.path.exists(input_file):
             print(f"Error: Input file {input_file} not found.")
             return
 
         with open(input_file, 'r') as f:
             pairs = json.load(f)
+        
+        # Compute current classification hash
+        current_hash = compute_classification_hash()
+        print(f"Current classification hash: {current_hash[:8]}...")
             
         # Track which commits have been processed with category
         processed_commits = set()
@@ -175,22 +186,39 @@ class GeminiClassifier(BaseAIClassifier):
             category = pair.get("category")
             if category is not None and category != "":
                 processed_commits.add(to_commit)
+        
+        # Count how many need classification based on cache
+        items_to_classify = []
+        items_skipped = 0
+        
+        for pair in pairs:
+            to_commit = pair.get("to_commit") or pair.get("good_commit")
+            pr_id = pair.get("pr_id")
+            
+            # Use PR ID if available, otherwise use commit hash as identifier
+            item_id = str(pr_id) if pr_id else to_commit
+            
+            # Skip if already has category and cache says no reclassification needed
+            if to_commit in processed_commits:
+                if not self.cache_manager.needs_classification(item_id, current_hash, reclassify):
+                    items_skipped += 1
+                    continue
+            
+            items_to_classify.append((item_id, pair))
+        
+        if items_skipped > 0:
+            print(f"Skipping classification for {items_skipped} items (no changes to classification configuration)")
                 
         print(f"Found {len(processed_commits)} already classified pairs.")
-        print(f"Classifying {len(pairs) - len(processed_commits)} remaining pairs with Gemini...")
+        print(f"Classifying {len(items_to_classify)} pairs with Gemini...")
         
         new_count = 0
         
-        for i, pair in enumerate(pairs):
+        for i, (item_id, pair) in enumerate(items_to_classify):
             to_commit = pair.get("to_commit") or pair.get("good_commit")
-            
-            if to_commit in processed_commits:
-                print(f"[{i+1}/{len(pairs)}] Skipping {to_commit[:7]} (Already processed)")
-                continue
-                
             msg = pair.get("to_msg") or pair.get("good_msg")
             
-            print(f"[{i+1}/{len(pairs)}] Fetching diff for {to_commit[:7]}...")
+            print(f"[{i+1}/{len(items_to_classify)}] Fetching diff for {to_commit[:7]}...")
             diff = self.get_commit_diff(to_commit)
             
             print(f"  Asking Gemini...")
@@ -228,6 +256,9 @@ class GeminiClassifier(BaseAIClassifier):
             processed_commits.add(to_commit)
             new_count += 1
             
+            # Update cache with current hash for this item
+            self.cache_manager.set_cached_hash(item_id, current_hash)
+            
             # Save incrementally every 5 items
             if new_count % 5 == 0:
                 with open(input_file, 'w') as f:
@@ -246,6 +277,7 @@ def main():
     parser = argparse.ArgumentParser(description="Gemini Classifier")
     parser.add_argument("repo", help="owner/name")
     parser.add_argument("--input", help="Input file path (default: results/per_repo/{owner}_{name}.json)")
+    parser.add_argument("--reclassify", action="store_true", help="Force reclassification even if already classified")
     
     args = parser.parse_args()
     
@@ -269,7 +301,7 @@ def main():
         return
     
     classifier = GeminiClassifier(gh_token, gemini_key, owner, name)
-    classifier.run(input_file)
+    classifier.run(input_file, reclassify=args.reclassify)
 
 if __name__ == "__main__":
     main()

@@ -171,10 +171,10 @@ def run_classification(repo, classifier, classification_input, reclassify=False)
             ["python3", "-m", "classification.simple_classifier", repo, "--input", classification_input],
             f"Running Simple Classifier for {repo} (prerequisite for Gemini)"
         )
-        run_step(
-            ["python3", "-m", "classification.gemini_classifier", repo, "--input", classification_input],
-            f"Running Gemini Classification for {repo}"
-        )
+        cmd = ["python3", "-m", "classification.gemini_classifier", repo, "--input", classification_input]
+        if reclassify:
+            cmd.append("--reclassify")
+        run_step(cmd, f"Running Gemini Classification for {repo}")
     
     # GPT Classification (runs on any mining type)
     elif classifier == "gpt":
@@ -183,10 +183,10 @@ def run_classification(repo, classifier, classification_input, reclassify=False)
             ["python3", "-m", "classification.simple_classifier", repo, "--input", classification_input],
             f"Running Simple Classifier for {repo} (prerequisite for GPT)"
         )
-        run_step(
-            ["python3", "-m", "classification.gpt_classifier", repo, "--input", classification_input],
-            f"Running GPT Classification for {repo}"
-        )
+        cmd = ["python3", "-m", "classification.gpt_classifier", repo, "--input", classification_input]
+        if reclassify:
+            cmd.append("--reclassify")
+        run_step(cmd, f"Running GPT Classification for {repo}")
     
     # Claude Classification (runs on any mining type)
     elif classifier == "claude":
@@ -195,10 +195,10 @@ def run_classification(repo, classifier, classification_input, reclassify=False)
             ["python3", "-m", "classification.simple_classifier", repo, "--input", classification_input],
             f"Running Simple Classifier for {repo} (prerequisite for Claude)"
         )
-        run_step(
-            ["python3", "-m", "classification.claude_classifier", repo, "--input", classification_input],
-            f"Running Claude Classification for {repo}"
-        )
+        cmd = ["python3", "-m", "classification.claude_classifier", repo, "--input", classification_input]
+        if reclassify:
+            cmd.append("--reclassify")
+        run_step(cmd, f"Running Claude Classification for {repo}")
 
 def process_repo(repo, search_limit, results_limit, mining_type, classifier, timeout_seconds, reclassify):
     print(f"\n*** PROCESSING REPO: {repo} ***")
