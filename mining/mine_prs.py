@@ -289,7 +289,6 @@ class PRMiner:
                             # Check for duplicates before adding
                             if not any(r['to_commit'] == oid for r in results):
                                 results.append(pair)
-                                print(f"Found pair in PR #{pr_number}: {bad_commit['oid'][:7]} -> {oid[:7]}")
                             
                             last_bad_commit = None
                 
@@ -402,7 +401,6 @@ class PRMiner:
                             # Check for duplicates before adding
                             if not any(r['to_commit'] == oid for r in results):
                                 results.append(pair)
-                                print(f"Found pair in PR #{pr_number}: {bad_commit['oid'][:7]} -> {oid[:7]}")
                                 
                                 # Check limit immediately after adding
                                 if results_limit and len(results) >= results_limit:

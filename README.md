@@ -12,7 +12,9 @@ This project mines GitHub repositories for "Self-Correction" pairs (Bad Commit -
     Create a `.env` file:
     ```env
     GITHUB_TOKEN=your_github_pat
-    GEMINI_API_KEY=your_gemini_key  # Only needed for AI classification
+    GEMINI_API_KEY=your_gemini_key        # Only needed for --classifier gemini
+    OPENAI_API_KEY=your_openai_key        # Only needed for --classifier gpt
+    ANTHROPIC_API_KEY=your_anthropic_key  # Only needed for --classifier claude
     ```
 
 ## Usage
@@ -39,7 +41,9 @@ python3 run_pipeline.py repos.txt --search-limit 100
 
 #### Classification
 - `--classifier simple` (default) - Fast heuristic classification
-- `--classifier ai` - AI-powered classification using Gemini (requires GEMINI_API_KEY)
+- `--classifier gemini` - AI-powered classification using Google Gemini (requires GEMINI_API_KEY)
+- `--classifier gpt` - AI-powered classification using OpenAI GPT (requires OPENAI_API_KEY)
+- `--classifier claude` - AI-powered classification using Anthropic Claude (requires ANTHROPIC_API_KEY)
 
 #### Other Options
 - `--reclassify` - Clear and re-run classification on existing results
@@ -53,8 +57,14 @@ python3 run_pipeline.py repos.txt --search-limit 100
 # Basic usage - search 100 PRs with simple classification
 python3 run_pipeline.py android/nowinandroid --search-limit 100
 
-# Find 50 pairs with AI classification
-python3 run_pipeline.py android/nowinandroid --results-limit 50 --classifier ai
+# Find 50 pairs with Gemini AI classification
+python3 run_pipeline.py android/nowinandroid --results-limit 50 --classifier gemini
+
+# Find 50 pairs with GPT AI classification
+python3 run_pipeline.py android/nowinandroid --results-limit 50 --classifier gpt
+
+# Find 50 pairs with Claude AI classification
+python3 run_pipeline.py android/nowinandroid --results-limit 50 --classifier claude
 
 # Re-classify existing results
 python3 run_pipeline.py android/nowinandroid --search-limit 100 --reclassify

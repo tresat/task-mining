@@ -187,6 +187,18 @@ def run_classification(repo, classifier, classification_input, reclassify=False)
             ["python3", "-m", "classification.gpt_classifier", repo, "--input", classification_input],
             f"Running GPT Classification for {repo}"
         )
+    
+    # Claude Classification (runs on any mining type)
+    elif classifier == "claude":
+        # Claude classifier needs analyzed results, so run simple first as prerequisite
+        run_step(
+            ["python3", "-m", "classification.simple_classifier", repo, "--input", classification_input],
+            f"Running Simple Classifier for {repo} (prerequisite for Claude)"
+        )
+        run_step(
+            ["python3", "-m", "classification.claude_classifier", repo, "--input", classification_input],
+            f"Running Claude Classification for {repo}"
+        )
 
 def process_repo(repo, search_limit, results_limit, mining_type, classifier, timeout_seconds, reclassify):
     print(f"\n*** PROCESSING REPO: {repo} ***")
@@ -280,6 +292,14 @@ def validate_tokens(classifier):
         else:
             print("✓ OPENAI_API_KEY is set")
     
+    # ANTHROPIC_API_KEY is required if using Claude classification
+    if classifier == "claude":
+        anthropic_key = os.getenv("ANTHROPIC_API_KEY")
+        if not anthropic_key:
+            missing_tokens.append("ANTHROPIC_API_KEY")
+        else:
+            print("✓ ANTHROPIC_API_KEY is set")
+    
     if missing_tokens:
         print(f"\n❌ Error: The following required environment variables are not set:")
         for token in missing_tokens:
@@ -291,6 +311,8 @@ def validate_tokens(classifier):
             print("GEMINI_API_KEY=your_gemini_api_key_here")
         if classifier == "gpt":
             print("OPENAI_API_KEY=your_openai_api_key_here")
+        if classifier == "claude":
+            print("ANTHROPIC_API_KEY=your_anthropic_api_key_here")
         sys.exit(1)
     
     print("\n✓ All required tokens are set")
@@ -306,8 +328,8 @@ def main():
     parser.add_argument("--reclassify", action="store_true", help="Clear category and tags fields before re-running classification")
     parser.add_argument("--type", default="prs", choices=["prs", "commits"],
                        help="Type of mining to run (Step 1): 'prs' (PR-based bad->good) or 'commits' (commit-based pairs with successful builds). Default: prs")
-    parser.add_argument("--classifier", default="simple", choices=["simple", "gemini", "gpt"],
-                       help="Classification to run (Steps 2 and 2b): 'simple' (heuristic), 'gemini' (Gemini API), or 'gpt' (OpenAI GPT). AI classifiers automatically run simple as prerequisite. Runs on the mining results from Step 1. Default: simple")
+    parser.add_argument("--classifier", default="simple", choices=["simple", "gemini", "gpt", "claude"],
+                       help="Classification to run (Steps 2 and 2b): 'simple' (heuristic), 'gemini' (Google Gemini), 'gpt' (OpenAI GPT), or 'claude' (Anthropic Claude). AI classifiers automatically run simple as prerequisite. Runs on the mining results from Step 1. Default: simple")
     
     args = parser.parse_args()
     
@@ -326,14 +348,14 @@ def main():
     # Clean cache if requested (done first, before anything else)
     if args.clean_cache:
         from mining.cache import CacheManager
-        from classification.base_ai_classifier import COMMIT_DIFF_CACHE_DIR
         CacheManager.clear_all_caches()
         
-        # Also clean commit diff cache
-        if os.path.exists(COMMIT_DIFF_CACHE_DIR):
-            print(f"Cleaning {COMMIT_DIFF_CACHE_DIR}/ directory...")
-            shutil.rmtree(COMMIT_DIFF_CACHE_DIR)
-            print(f"Removed {COMMIT_DIFF_CACHE_DIR}/")
+        # Also clean per-repo commit diff caches
+        cache_root = ".cache"
+        if os.path.exists(cache_root):
+            print(f"Cleaning {cache_root}/ directory...")
+            shutil.rmtree(cache_root)
+            print(f"Removed {cache_root}/")
     
     # Clean entire results and state directories if requested (done first, before processing any repos)
     if args.clean:

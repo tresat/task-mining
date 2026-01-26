@@ -4,9 +4,6 @@ from abc import abstractmethod
 from typing import Dict, Any, Optional
 from classification.base_classifier import BaseClassifier
 
-# Cache directory for commit diffs
-COMMIT_DIFF_CACHE_DIR = os.path.join(".cache", "commit_contents")
-
 # Maximum characters to fetch from commit diff (to avoid excessive API response sizes)
 COMMIT_DIFF_MAX_LENGTH = 10000
 
@@ -30,6 +27,8 @@ class BaseAIClassifier(BaseClassifier):
         super().__init__(github_token, repo_owner, repo_name)
         self.api_key = api_key
         self.categories = self._load_categories()
+        # Per-repo cache directory for commit diffs
+        self.commit_diff_cache_dir = os.path.join(".cache", f"{self.owner}_{self.name}", "commit_contents")
     
     def _load_categories(self) -> Dict[str, str]:
         """
@@ -69,7 +68,7 @@ class BaseAIClassifier(BaseClassifier):
         Fetches the diff of a commit from GitHub.
         
         This method uses caching to avoid redundant API calls.
-        Cache location: .cache/commit_contents/{commit_sha}.txt
+        Cache location: .cache/{owner}_{name}/commit_contents/{commit_sha}.txt
         
         This is a concrete method shared by all AI classifiers.
         """
@@ -80,7 +79,7 @@ class BaseAIClassifier(BaseClassifier):
             return ""
         
         # Define cache path
-        cache_file = os.path.join(COMMIT_DIFF_CACHE_DIR, f"{commit_sha}.txt")
+        cache_file = os.path.join(self.commit_diff_cache_dir, f"{commit_sha}.txt")
         
         # Check if diff exists in cache
         if os.path.exists(cache_file):
@@ -106,7 +105,7 @@ class BaseAIClassifier(BaseClassifier):
                 
                 # Save to cache
                 try:
-                    os.makedirs(COMMIT_DIFF_CACHE_DIR, exist_ok=True)
+                    os.makedirs(self.commit_diff_cache_dir, exist_ok=True)
                     with open(cache_file, 'w', encoding='utf-8') as f:
                         f.write(diff_content)
                     print(f"Cached diff for {commit_sha}")
