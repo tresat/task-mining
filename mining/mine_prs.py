@@ -298,15 +298,28 @@ class PRMiner:
             with open(output_file, "w") as f:
                 json.dump(results, f, indent=2)
             new_from_cache = len(results) - initial_results_count
-            print(f"\nCache exhausted. Found {new_from_cache} new pairs from cache.")
+            
+            # Report cache processing results
+            if new_from_cache > 0:
+                print(f"\nProcessed {processed_count} PRs from cache. Found {new_from_cache} new pairs.")
+            else:
+                print(f"\nProcessed {processed_count} PRs from cache. No new valid pairs found.")
             
             # If we've hit limits, return
             if results_limit and len(results) >= results_limit:
+                print(f"Reached results limit of {results_limit} pairs.")
                 return results
             if search_limit and processed_count >= search_limit:
+                print(f"Reached search limit of {search_limit} PRs.")
                 return results
             
-            print(f"Fetching more PRs from GitHub...\n")
+            # Only fetch more from GitHub if cache was small (< 100 PRs)
+            # If we have a large cache but no results, the repo likely doesn't have many valid pairs
+            if cache_manager.size() < 100:
+                print(f"Cache has fewer than 100 PRs. Fetching more from GitHub...\n")
+            else:
+                print(f"Cache has {cache_manager.size()} PRs. Stopping search (found {len(results)} pairs total).")
+                return results
         
         # Continue with GitHub API queries
         while True:
@@ -334,7 +347,9 @@ class PRMiner:
                 "limit": batch_size
             }
             
-            print(f"Fetching PRs from GitHub (cursor={cursor})...")
+            # Abbreviate cursor for display
+            cursor_display = f"{cursor[:20]}..." if cursor and len(cursor) > 20 else cursor
+            print(f"Fetching PRs from GitHub (cursor={cursor_display}, processed={processed_count})...")
             data = self._query(PR_QUERY, variables)
             
             if not data.get("data") or not data["data"].get("repository"):

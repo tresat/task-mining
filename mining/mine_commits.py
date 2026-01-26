@@ -349,7 +349,9 @@ class CommitMiner:
                 "limit": batch_size
             }
             
-            print(f"Fetching commits from GitHub (cursor={cursor})...")
+            # Abbreviate cursor for display
+            cursor_display = f"{cursor[:20]}..." if cursor and len(cursor) > 20 else cursor
+            print(f"Fetching commits from GitHub (cursor={cursor_display}, processed={processed_count})...")
             data = self._query(COMMITS_QUERY, variables)
             
             if not data.get("data") or not data["data"].get("repository"):

@@ -174,7 +174,9 @@ def prime_pr_cache(miner, cache_manager: CacheManager, max_items: int = MAX_CACH
             "limit": batch_size
         }
         
-        print(f"Fetching PR list from GitHub (cursor={cursor})...")
+        # Abbreviate cursor for display
+        cursor_display = f"{cursor[:20]}..." if cursor and len(cursor) > 20 else cursor
+        print(f"Fetching PR list from GitHub (cursor={cursor_display})...")
         data = miner._query(PR_QUERY, variables)
         
         if not data.get("data") or not data["data"].get("repository"):
@@ -266,7 +268,9 @@ def prime_commit_cache(miner, cache_manager: CacheManager, ref: str, max_items: 
             "limit": batch_size
         }
         
-        print(f"Fetching commit list from GitHub (cursor={cursor})...")
+        # Abbreviate cursor for display
+        cursor_display = f"{cursor[:20]}..." if cursor and len(cursor) > 20 else cursor
+        print(f"Fetching commit list from GitHub (cursor={cursor_display})...")
         data = miner._query(COMMITS_QUERY, variables)
         
         if not data.get("data") or not data["data"].get("repository"):
