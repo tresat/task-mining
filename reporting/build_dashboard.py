@@ -297,7 +297,32 @@ def generate_dashboard_html(raw_data):
             color: var(--text-secondary);
         }}
 
+        .download-btn {{
+            padding: 0.6rem 1.2rem;
+            border-radius: 0.5rem;
+            font-size: 0.95rem;
+            font-weight: 600;
+            background-color: var(--accent);
+            color: var(--bg-color);
+            cursor: pointer;
+            transition: all 0.2s;
+            border: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }}
+
+        .download-btn:hover {{
+            background-color: var(--accent-hover);
+        }}
+
+        .download-btn:disabled {{
+            opacity: 0.5;
+            cursor: not-allowed;
+        }}
+
         .result-card {{
+            position: relative;
             background-color: var(--card-bg);
             border: 1px solid var(--border);
             border-radius: 0.75rem;
@@ -316,6 +341,23 @@ def generate_dashboard_html(raw_data):
             justify-content: space-between;
             align-items: start;
             margin-bottom: 1rem;
+            gap: 1rem;
+        }}
+
+        .result-checkbox {{
+            position: relative;
+            top: 0.25rem;
+            width: 1.2rem;
+            height: 1.2rem;
+            cursor: pointer;
+            accent-color: var(--accent);
+        }}
+
+        .result-title-wrapper {{
+            display: flex;
+            align-items: start;
+            gap: 0.75rem;
+            flex: 1;
         }}
 
         .result-title {{
@@ -486,7 +528,13 @@ def generate_dashboard_html(raw_data):
         <div class="results-section">
             <div class="section-header">
                 <h2 class="section-title">Results</h2>
-                <span class="filter-info" id="filterInfo"></span>
+                <div style="display: flex; align-items: center; gap: 1rem;">
+                    <span class="filter-info" id="filterInfo"></span>
+                    <button class="download-btn" id="downloadBtn" onclick="downloadSelected()" disabled>
+                        <span>📥</span>
+                        <span id="downloadBtnText">Download Selected</span>
+                    </button>
+                </div>
             </div>
             <div id="resultsContainer"></div>
         </div>
@@ -499,6 +547,7 @@ def generate_dashboard_html(raw_data):
         let currentRepoFilter = 'ALL';
         let currentTagFilter = null;
         let currentCategoryFilter = null;
+        let selectedItems = new Set();
 
         function initializeRepoFilter() {{
             const repos = new Set(rawData.map(r => r.repo_url));
@@ -543,6 +592,8 @@ def generate_dashboard_html(raw_data):
 
         function updateDisplay() {{
             currentRepoFilter = document.getElementById('repoFilter').value;
+            // Clear selections when filters change
+            selectedItems.clear();
             updateStats();
             updateTagsList();
             updateChart();
@@ -712,7 +763,8 @@ def generate_dashboard_html(raw_data):
                 return;
             }}
             
-            container.innerHTML = filteredData.map(result => {{
+            container.innerHTML = filteredData.map((result, index) => {{
+                const resultId = `result-${{index}}`;
                 const repoName = result.repo_url ? result.repo_url.split('/').slice(-2).join('/') : 'Unknown';
                 const prUrl = result.pr_id && result.repo_url ? 
                     `${{result.repo_url}}/pull/${{result.pr_id}}` : null;
@@ -772,9 +824,12 @@ def generate_dashboard_html(raw_data):
                 }}
                 
                 return `
-                    <div class="result-card">
+                    <div class="result-card" data-index="${{index}}">
                         <div class="result-header">
-                            <a href="${{link}}" target="_blank" class="result-title">${{title}}</a>
+                            <div class="result-title-wrapper">
+                                <input type="checkbox" class="result-checkbox" id="${{resultId}}" onchange="toggleSelection(${{index}})" ${{selectedItems.has(index) ? 'checked' : ''}}>
+                                <a href="${{link}}" target="_blank" class="result-title">${{title}}</a>
+                            </div>
                         </div>
                         <div class="result-meta">
                             <span class="result-meta-item">📦 ${{repoName}}</span>
@@ -800,6 +855,70 @@ def generate_dashboard_html(raw_data):
                 }}
                 document.getElementById('filterInfo').textContent += filterText;
             }}
+            
+            // Update download button state
+            updateDownloadButton();
+        }}
+
+        function toggleSelection(index) {{
+            if (selectedItems.has(index)) {{
+                selectedItems.delete(index);
+            }} else {{
+                selectedItems.add(index);
+            }}
+            updateDownloadButton();
+        }}
+
+        function updateDownloadButton() {{
+            const downloadBtn = document.getElementById('downloadBtn');
+            const btnText = document.getElementById('downloadBtnText');
+            const count = selectedItems.size;
+            
+            if (count > 0) {{
+                downloadBtn.disabled = false;
+                btnText.textContent = `Download Selected (${{count}})`;
+            }} else {{
+                downloadBtn.disabled = true;
+                btnText.textContent = 'Download Selected';
+            }}
+        }}
+
+        function downloadSelected() {{
+            if (selectedItems.size === 0) {{
+                alert('Please select at least one item to download.');
+                return;
+            }}
+
+            // Prompt for filename
+            const defaultFilename = `selected_results_${{new Date().toISOString().split('T')[0]}}.json`;
+            const filename = prompt('Enter filename for the download:', defaultFilename);
+            
+            if (!filename) {{
+                return; // User cancelled
+            }}
+
+            // Get filtered data and select only checked items
+            const filteredData = getFilteredData();
+            const selectedData = Array.from(selectedItems)
+                .map(index => filteredData[index])
+                .filter(item => item !== undefined);
+
+            // Create JSON blob
+            const jsonStr = JSON.stringify(selectedData, null, 2);
+            const blob = new Blob([jsonStr], {{ type: 'application/json' }});
+            
+            // Create download link
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename.endsWith('.json') ? filename : filename + '.json';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            // Show success message
+            alert(`Downloaded ${{selectedData.length}} item(s) to ${{a.download}}`);
         }}
 
         // Initialize on load
