@@ -215,11 +215,19 @@ class TestNewClassifications(unittest.TestCase):
                     },
                     {
                         "filename": "build.gradle",
-                        "patch": """@@ -1,4 +1,5 @@
+                        "patch": """@@ -1,4 +1,4 @@
  plugins {
 -    id 'com.android.application' version '7.0.0'
 +    id 'com.android.application' version '8.0.0'
+ }
+"""
+                    },
+                    {
+                        "filename": "src/main/java/Example.java",
+                        "patch": """@@ -1,3 +1,4 @@
+ public class Example {
 +    @SuppressWarnings("deprecation")
+     private Object obj;
  }
 """
                     }

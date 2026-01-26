@@ -304,33 +304,41 @@ class SimpleClassifier(BaseClassifier):
         """
         Check if the change updates a Gradle plugin version.
         
-        Looks for changes to plugin declarations in build files.
+        Looks for changes to plugin declarations in build files where
+        both a plugin identifier and version are present in changed lines.
         """
         for file_obj in files:
             filename = file_obj.get("filename", "")
             patch = file_obj.get("patch", "")
             
             # Check build scripts and version catalogs
-            if filename.endswith(("build.gradle", "build.gradle.kts", "libs.versions.toml")):
-                # Look for plugin-related patterns in the patch
-                plugin_patterns = [
-                    r'plugins\s*\{',  # plugins block
-                    r'id\s*["\']',    # plugin id
-                    r'id\(.*\)',      # plugin id() in Kotlin DSL
-                    r'apply\s+plugin',  # apply plugin
-                    r'\[plugins\]',   # [plugins] in toml
+            if filename.endswith(("build.gradle", "build.gradle.kts")):
+                # Look for added/removed lines with both plugin id and version
+                # Pattern matches lines like: id 'plugin.name' version '1.2.3'
+                plugin_with_version_patterns = [
+                    r'id\s+["\'][^"\']+["\']\s+version\s+["\']',  # Groovy: id 'x' version 'y'
+                    r'id\(["\'][^"\']+["\']\)\s+version\s+["\']',  # Kotlin: id("x") version "y"
                 ]
                 
-                for pattern in plugin_patterns:
-                    if re.search(pattern, patch):
-                        # Check if there's a version change in the patch
-                        version_patterns = [
-                            r'version\s*[=:]?\s*["\']',
-                            r':\d+\.\d+',  # :1.2.3 format
-                        ]
-                        for ver_pattern in version_patterns:
-                            if re.search(ver_pattern, patch):
+                for line in patch.split('\n'):
+                    # Only check added or removed lines
+                    if line.startswith(('+', '-')) and not line.startswith(('+++', '---')):
+                        for pattern in plugin_with_version_patterns:
+                            if re.search(pattern, line):
                                 return True
+                                
+            elif filename.endswith("libs.versions.toml"):
+                # In version catalogs, check for plugin entries in [plugins] section
+                in_plugins_section = False
+                for line in patch.split('\n'):
+                    if '[plugins]' in line:
+                        in_plugins_section = True
+                    elif line.strip().startswith('[') and '[plugins]' not in line:
+                        in_plugins_section = False
+                    elif in_plugins_section and (line.startswith('+') or line.startswith('-')) and not line.startswith(('+++', '---')):
+                        # Check if line contains version reference
+                        if 'version' in line or re.search(r'\d+\.\d+', line):
+                            return True
         return False
     
     def check_warning_suppression(self, files: list) -> bool:
