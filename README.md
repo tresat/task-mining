@@ -129,9 +129,25 @@ Categories are defined in `classification/categories/*.txt` files:
 - **Feature** - Adding new functionality
 - **Refactor** - Code restructuring without changing functionality
 - **Dependency Update** - Version updates, library changes
+- **Gradle Update** - Gradle wrapper version updates (may include minor other changes)
+- **Documentation** - Changes to documentation files
 - **Other** - Doesn't fit other categories
 
 Add custom categories by creating new `.txt` files in the `classification/categories/` directory.
+
+## Classification Tags
+
+Tags are defined in `classification/tags/*.txt` files and can be combined:
+- **dependencies** - Dependency-related changes
+- **version-update** - Version number increases
+- **wrapper-update** - Gradle wrapper version changes
+- **plugin-update** - Gradle plugin version updates
+- **configuration-cache-update** - Configuration cache enablement
+- **warning-suppression** - Warning suppression annotations
+- **tests** - Changes to test files
+- **documentation** - Documentation changes
+
+Add custom tags by creating new `.txt` files in the `classification/tags/` directory.
 
 ## Caching
 

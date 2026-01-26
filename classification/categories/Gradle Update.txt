@@ -1,0 +1,3 @@
+A change that is primarily an update to the Gradle version in the gradle wrapper properties (gradle/wrapper/gradle-wrapper.properties).
+This MUST include a change to the gradle version in the gradle wrapper properties file.
+It MAY include other source code or buildscript changes, but these should be MINOR.
