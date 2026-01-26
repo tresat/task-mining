@@ -419,16 +419,14 @@ class PRMiner:
             cursor = prs["pageInfo"]["endCursor"]
             self.save_state(state_file, cursor)
             
+            # Save to file (always)
+            with open(output_file, "w") as f:
+                json.dump(results, f, indent=2)
+            
             # Only print save message if new pairs were added in this batch
             batch_pairs_added = len(results) - batch_start_count
             if batch_pairs_added > 0:
-                with open(output_file, "w") as f:
-                    json.dump(results, f, indent=2)
                 print(f"Saved {len(results)} pairs (total) to {output_file}")
-            else:
-                # Still save to file but don't print message
-                with open(output_file, "w") as f:
-                    json.dump(results, f, indent=2)
             
             if not prs["pageInfo"]["hasNextPage"]:
                 print("Reached end of PRs.")
