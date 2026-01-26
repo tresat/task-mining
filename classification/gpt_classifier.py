@@ -10,17 +10,21 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 from mining.mine_common import load_env
 
-class GeminiClassifier:
-    def __init__(self, github_token: str, gemini_key: str, repo_owner: str, repo_name: str):
+class GPTClassifier:
+    def __init__(self, github_token: str, openai_key: str, repo_owner: str, repo_name: str):
         self.github_token = github_token
-        self.gemini_key = gemini_key
+        self.openai_key = openai_key
         self.owner = repo_owner
         self.name = repo_name
         self.headers = {
             "Authorization": f"Bearer {github_token}",
             "Accept": "application/vnd.github.v3.diff"
         }
-        self.gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={gemini_key}"
+        self.openai_url = "https://api.openai.com/v1/chat/completions"
+        self.openai_headers = {
+            "Authorization": f"Bearer {openai_key}",
+            "Content-Type": "application/json"
+        }
         
         # Load categories from files
         self.categories = self._load_categories()
@@ -69,8 +73,8 @@ class GeminiClassifier:
             print(f"Error fetching diff for {commit_sha}: {e}")
             return ""
 
-    def classify_with_gemini(self, message: str, diff: str) -> dict:
-        """Asks Gemini for sub-categorization using REST API.
+    def classify_with_gpt(self, message: str, diff: str) -> dict:
+        """Asks GPT for sub-categorization using OpenAI API.
         
         Returns:
             dict with 'sub_category' and 'error' keys. 
@@ -87,34 +91,36 @@ class GeminiClassifier:
         for category_name, description in self.categories.items():
             category_descriptions.append(f"**{category_name}**: {description}")
         
-        prompt_text = f"""
-        Analyze the following commit to determine its sub-category.
-        
-        Commit Message:
-        {message}
-        
-        Diff Snippet:
-        {diff}
-        
-        Classify this commit into ONE of these categories:
-        
-        {chr(10).join(category_descriptions)}
-        
-        Answer with ONLY the category name from the list above.
-        """
+        prompt_text = f"""Analyze the following commit to determine its sub-category.
+
+Commit Message:
+{message}
+
+Diff Snippet:
+{diff}
+
+Classify this commit into ONE of these categories:
+
+{chr(10).join(category_descriptions)}
+
+Answer with ONLY the category name from the list above."""
         
         payload = {
-            "contents": [{
-                "parts": [{"text": prompt_text}]
-            }]
+            "model": "gpt-4o-mini",
+            "messages": [
+                {"role": "system", "content": "You are a code classification assistant. Respond with only the category name."},
+                {"role": "user", "content": prompt_text}
+            ],
+            "temperature": 0.3,
+            "max_tokens": 50
         }
         
         try:
-            response = requests.post(self.gemini_url, json=payload, timeout=30)
+            response = requests.post(self.openai_url, json=payload, headers=self.openai_headers, timeout=30)
             if response.status_code == 200:
                 data = response.json()
                 try:
-                    answer = data["candidates"][0]["content"]["parts"][0]["text"].strip()
+                    answer = data["choices"][0]["message"]["content"].strip()
                     # Extract the sub-category from the response by checking against known categories
                     for category_name in self.categories.keys():
                         if category_name in answer:
@@ -127,16 +133,16 @@ class GeminiClassifier:
                     else:
                         return {"sub_category": "Unknown", "error": None}
                 except (KeyError, IndexError) as e:
-                    error_msg = f"Error parsing Gemini response: {e}"
+                    error_msg = f"Error parsing GPT response: {e}"
                     print(error_msg)
                     return {"sub_category": None, "error": error_msg}
             else:
                 error_msg = f"{response.status_code}: {response.text}"
-                print(f"Gemini API Error {response.status_code}")
+                print(f"OpenAI API Error {response.status_code}")
                 return {"sub_category": None, "error": error_msg}
         except Exception as e:
             error_msg = f"Request error: {str(e)}"
-            print(f"Gemini Request Error: {e}")
+            print(f"GPT Request Error: {e}")
             return {"sub_category": None, "error": error_msg}
 
     def run(self, input_file: str):
@@ -158,7 +164,7 @@ class GeminiClassifier:
                 processed_commits.add(to_commit)
                 
         print(f"Found {len(processed_commits)} already classified pairs.")
-        print(f"Classifying {len(pairs) - len(processed_commits)} remaining pairs with Gemini...")
+        print(f"Classifying {len(pairs) - len(processed_commits)} remaining pairs with GPT...")
         
         new_count = 0
         
@@ -174,8 +180,8 @@ class GeminiClassifier:
             print(f"[{i+1}/{len(pairs)}] Fetching diff for {to_commit[:7]}...")
             diff = self.get_commit_diff(to_commit)
             
-            print(f"  Asking Gemini...")
-            result = self.classify_with_gemini(msg, diff)
+            print(f"  Asking GPT...")
+            result = self.classify_with_gpt(msg, diff)
             ai_tag = result["sub_category"]  # Still using sub_category key in return for now
             error = result["error"]
             print(f"  Assigned Category: {ai_tag}")
@@ -207,21 +213,21 @@ class GeminiClassifier:
         # Final save
         with open(input_file, 'w') as f:
             json.dump(pairs, f, indent=2)
-        print(f"Updated {input_file} with AI tag classifications")
+        print(f"Updated {input_file} with GPT tag classifications")
 
 def main():
     load_env()
-    parser = argparse.ArgumentParser(description="Gemini Classifier")
+    parser = argparse.ArgumentParser(description="GPT Classifier")
     parser.add_argument("repo", help="owner/name")
     parser.add_argument("--input", help="Input file path (default: results/per_repo/{owner}_{name}.json)")
     
     args = parser.parse_args()
     
     gh_token = os.environ.get("GITHUB_TOKEN")
-    gemini_key = os.environ.get("GEMINI_API_KEY")
+    openai_key = os.environ.get("OPENAI_API_KEY")
     
-    if not gh_token or not gemini_key:
-        print("Error: GITHUB_TOKEN and GEMINI_API_KEY must be set.")
+    if not gh_token or not openai_key:
+        print("Error: GITHUB_TOKEN and OPENAI_API_KEY must be set.")
         return
         
     owner, name = args.repo.split("/", 1)
@@ -236,7 +242,7 @@ def main():
         print(f"Error: Input file {input_file} not found.")
         return
     
-    classifier = GeminiClassifier(gh_token, gemini_key, owner, name)
+    classifier = GPTClassifier(gh_token, openai_key, owner, name)
     classifier.run(input_file)
 
 if __name__ == "__main__":

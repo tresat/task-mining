@@ -126,7 +126,7 @@ def run_mining(repo, search_limit, results_limit, mining_type, output_dir, state
     return classification_input
 
 # Fields to clear during reclassification
-RECLASSIFY_FIELDS = ['category', 'tags']
+RECLASSIFY_FIELDS = ['category', 'tags', 'error']
 
 def run_classification(repo, classifier, classification_input, reclassify=False):
     """
@@ -172,17 +172,31 @@ def run_classification(repo, classifier, classification_input, reclassify=False)
             show_header=False
         )
     
-    # AI Classification (runs on any mining type)
-    elif classifier == "ai":
+    # Gemini Classification (runs on any mining type)
+    elif classifier == "gemini":
         # AI classifier needs analyzed results, so run simple first as prerequisite
         run_step(
             ["python3", "-m", "classification.simple_classifier", repo, "--input", classification_input],
-            f"Running Simple Classifier for {repo} (prerequisite for AI)",
+            f"Running Simple Classifier for {repo} (prerequisite for Gemini)",
             show_header=False
         )
         run_step(
             ["python3", "-m", "classification.gemini_classifier", repo, "--input", classification_input],
-            f"Running AI Classification (Gemini) for {repo}",
+            f"Running Gemini Classification for {repo}",
+            show_header=False
+        )
+    
+    # GPT Classification (runs on any mining type)
+    elif classifier == "gpt":
+        # GPT classifier needs analyzed results, so run simple first as prerequisite
+        run_step(
+            ["python3", "-m", "classification.simple_classifier", repo, "--input", classification_input],
+            f"Running Simple Classifier for {repo} (prerequisite for GPT)",
+            show_header=False
+        )
+        run_step(
+            ["python3", "-m", "classification.gpt_classifier", repo, "--input", classification_input],
+            f"Running GPT Classification for {repo}",
             show_header=False
         )
 
@@ -262,13 +276,21 @@ def validate_tokens(classifier):
     else:
         print("✓ GITHUB_TOKEN is set")
     
-    # GEMINI_API_KEY is required if using AI classification
-    if classifier == "ai":
+    # GEMINI_API_KEY is required if using Gemini classification
+    if classifier == "gemini":
         gemini_key = os.getenv("GEMINI_API_KEY")
         if not gemini_key:
             missing_tokens.append("GEMINI_API_KEY")
         else:
             print("✓ GEMINI_API_KEY is set")
+    
+    # OPENAI_API_KEY is required if using GPT classification
+    if classifier == "gpt":
+        openai_key = os.getenv("OPENAI_API_KEY")
+        if not openai_key:
+            missing_tokens.append("OPENAI_API_KEY")
+        else:
+            print("✓ OPENAI_API_KEY is set")
     
     if missing_tokens:
         print(f"\n❌ Error: The following required environment variables are not set:")
@@ -277,8 +299,10 @@ def validate_tokens(classifier):
         print("\nPlease ensure you have a .env file in the project root with these variables.")
         print("Example .env format:")
         print("GITHUB_TOKEN=your_github_token_here")
-        if classifier == "ai":
+        if classifier == "gemini":
             print("GEMINI_API_KEY=your_gemini_api_key_here")
+        if classifier == "gpt":
+            print("OPENAI_API_KEY=your_openai_api_key_here")
         sys.exit(1)
     
     print("\n✓ All required tokens are set")
@@ -294,8 +318,8 @@ def main():
     parser.add_argument("--reclassify", action="store_true", help="Clear category and tags fields before re-running classification")
     parser.add_argument("--type", default="prs", choices=["prs", "commits"],
                        help="Type of mining to run (Step 1): 'prs' (PR-based bad->good) or 'commits' (commit-based pairs with successful builds). Default: prs")
-    parser.add_argument("--classifier", default="simple", choices=["simple", "ai"],
-                       help="Classification to run (Steps 2 and 2b): 'simple' (heuristic) or 'ai' (Gemini, automatically runs simple as prerequisite). Runs on the mining results from Step 1. Default: simple")
+    parser.add_argument("--classifier", default="simple", choices=["simple", "gemini", "gpt"],
+                       help="Classification to run (Steps 2 and 2b): 'simple' (heuristic), 'gemini' (Gemini API), or 'gpt' (OpenAI GPT). AI classifiers automatically run simple as prerequisite. Runs on the mining results from Step 1. Default: simple")
     
     args = parser.parse_args()
     
