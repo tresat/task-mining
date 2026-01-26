@@ -277,16 +277,15 @@ class SimpleClassifier(BaseClassifier):
         """
         Check if buildscript changes appear to enable configuration cache.
         
-        Looks for patterns like:
-        - org.gradle.configuration-cache
-        - org.gradle.unsafe.configuration-cache
-        - configurationCache
+        Looks for patterns in added lines like:
+        - org.gradle.configuration-cache=true
+        - org.gradle.unsafe.configuration-cache=true
+        - configurationCache = true
         """
         patterns = [
-            r'org\.gradle\.configuration-cache',
-            r'org\.gradle\.unsafe\.configuration-cache',
-            r'configurationCache',
-            r'configuration-cache'
+            r'org\.gradle\.configuration-cache\s*=',
+            r'org\.gradle\.unsafe\.configuration-cache\s*=',
+            r'configurationCache\s*=',
         ]
         
         for file_obj in files:
@@ -295,9 +294,12 @@ class SimpleClassifier(BaseClassifier):
             
             # Check gradle property files and build scripts
             if any(f in filename for f in ["gradle.properties", "build.gradle", "build.gradle.kts", "settings.gradle", "settings.gradle.kts"]):
-                for pattern in patterns:
-                    if re.search(pattern, patch):
-                        return True
+                # Only check added lines to avoid matching existing code
+                for line in patch.split('\n'):
+                    if line.startswith('+') and not line.startswith('+++'):
+                        for pattern in patterns:
+                            if re.search(pattern, line):
+                                return True
         return False
     
     def check_plugin_update(self, files: list) -> bool:
@@ -336,8 +338,9 @@ class SimpleClassifier(BaseClassifier):
                     elif line.strip().startswith('[') and '[plugins]' not in line:
                         in_plugins_section = False
                     elif in_plugins_section and (line.startswith('+') or line.startswith('-')) and not line.startswith(('+++', '---')):
-                        # Check if line contains version reference
-                        if 'version' in line or re.search(r'\d+\.\d+', line):
+                        # Check if line contains version assignment pattern like: plugin-name = { id = "...", version = "..." }
+                        # or version.ref pattern like: plugin-name = { id = "...", version.ref = "..." }
+                        if re.search(r'version\s*[.=]', line) or re.search(r'=\s*["\'][^"\']*\d+\.\d+', line):
                             return True
         return False
     
@@ -355,7 +358,7 @@ class SimpleClassifier(BaseClassifier):
         """
         suppression_patterns = [
             r'@SuppressWarnings',
-            r'@Suppress\b',
+            r'@Suppress(?=\()',  # Match @Suppress followed by opening parenthesis
             r'@SuppressLint',
             r'//\s*noinspection',
             r'lint\.disable',
@@ -471,8 +474,11 @@ class SimpleClassifier(BaseClassifier):
                     gradle_dependencies_changed = True
                 else:
                     other_files_changed = True
-            elif "gradle-wrapper.properties" not in filename:
-                # Don't count gradle wrapper as "other files" for Gradle Update category
+            elif "gradle-wrapper.properties" in filename:
+                # Gradle wrapper file is tracked separately, don't count as "other files"
+                pass
+            else:
+                # Any other file is considered "other files"
                 other_files_changed = True
         
         # Apply classification rules
