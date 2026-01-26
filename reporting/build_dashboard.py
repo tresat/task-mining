@@ -579,6 +579,9 @@ def generate_dashboard_html(raw_data):
                     `${{result.repo_url}}/pull/${{result.pr_id}}` : null;
                 const commitUrl = result.repo_url && result.to_commit ?
                     `${{result.repo_url}}/commit/${{result.to_commit}}` : null;
+                const prLink = result.pr_id ? 
+                    `<a href="${{prUrl}}" target="_blank">#${{result.pr_id}}</a>` :
+                    null;
                 
                 // Build badges
                 let badges = '';
@@ -624,7 +627,7 @@ def generate_dashboard_html(raw_data):
                         </div>
                         <div class="result-meta">
                             <span class="result-meta-item">📦 ${{repoName}}</span>
-                            ${{result.pr_id ? `<span class="result-meta-item">PR #${{result.pr_id}}</span>` : ''}}
+                            ${{prLink ? `<span class="result-meta-item">PR ${{prLink}}</span>` : ''}}
                             ${{result.to_date ? `<span class="result-meta-item">📅 ${{new Date(result.to_date).toLocaleDateString()}}</span>` : ''}}
                         </div>
                         <div class="badges">${{badges}}</div>

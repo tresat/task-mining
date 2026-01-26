@@ -17,6 +17,8 @@ query ($owner: String!, $name: String!, $cursor: String, $limit: Int!) {
       }
       nodes {
         number
+        title
+        body
         url
         commits(first: 100) {
           pageInfo {
@@ -246,6 +248,14 @@ class PRMiner:
                 
                 pr_data = cached_prs[str(pr_number)]
                 commits = pr_data["commits"]["nodes"]
+                pr_title = pr_data.get("title", "")
+                pr_body = pr_data.get("body", "")
+                
+                # Build PR description
+                if pr_body:
+                    pr_description = f"{pr_title}\n\n{pr_body}"
+                else:
+                    pr_description = pr_title
                 
                 last_bad_commit = None
                 
@@ -266,7 +276,7 @@ class PRMiner:
                                 "from_msg": bad_commit["message"].split('\n')[0],
                                 "from_date": bad_commit["committedDate"],
                                 "to_commit": oid,
-                                "to_msg": msg,
+                                "to_msg": pr_description,
                                 "to_date": commit["committedDate"],
                                 "files_changed": [],  # Not available for PR-based mining; can be populated by classification
                                 "category": None,
@@ -357,7 +367,15 @@ class PRMiner:
                     return results
                 
                 pr_number = pr["number"]
+                pr_title = pr.get("title", "")
+                pr_body = pr.get("body", "")
                 commits = self.get_all_commits_for_pr(pr)
+                
+                # Build PR description
+                if pr_body:
+                    pr_description = f"{pr_title}\n\n{pr_body}"
+                else:
+                    pr_description = pr_title
                 
                 last_bad_commit = None
                 
@@ -378,7 +396,7 @@ class PRMiner:
                                 "from_msg": bad_commit["message"].split('\n')[0],
                                 "from_date": bad_commit["committedDate"],
                                 "to_commit": oid,
-                                "to_msg": msg,
+                                "to_msg": pr_description,
                                 "to_date": commit["committedDate"],
                                 "files_changed": [],  # Not available for PR-based mining; can be populated by classification
                                 "category": None,

@@ -125,13 +125,38 @@ def run_mining(repo, search_limit, results_limit, mining_type, output_dir, state
     
     return classification_input
 
-def run_classification(repo, classifier, classification_input):
+def run_classification(repo, classifier, classification_input, reclassify=False):
     """
     Run classification based on the specified classifier.
     Edits the per_repo file in-place.
+    
+    Args:
+        repo: Repository name
+        classifier: Type of classifier to use
+        classification_input: Path to the input file
+        reclassify: If True, clears category and tags fields before classification
     """
     if not classification_input or not os.path.exists(classification_input):
         return
+    
+    # If reclassify is enabled, clear category and tags fields
+    if reclassify:
+        try:
+            with open(classification_input, 'r') as f:
+                results = json.load(f)
+            
+            # Clear classification fields
+            for result in results:
+                result['category'] = None
+                result['tags'] = []
+            
+            # Save the cleared results
+            with open(classification_input, 'w') as f:
+                json.dump(results, f, indent=2)
+            
+            print(f"Cleared category and tags fields for {len(results)} results in {classification_input}")
+        except Exception as e:
+            print(f"Error clearing classification fields: {e}")
     
     # Simple/Heuristic Classification (runs on any mining type)
     if classifier == "simple":
@@ -155,7 +180,7 @@ def run_classification(repo, classifier, classification_input):
             show_header=False
         )
 
-def process_repo(repo, search_limit, results_limit, mining_type, classifier, timeout_seconds):
+def process_repo(repo, search_limit, results_limit, mining_type, classifier, timeout_seconds, reclassify):
     print(f"\n*** PROCESSING REPO: {repo} ***")
     
     if "/" not in repo:
@@ -172,7 +197,7 @@ def process_repo(repo, search_limit, results_limit, mining_type, classifier, tim
     classification_input = run_mining(repo, search_limit, results_limit, mining_type, output_dir, state_dir)
     
     # Classification
-    run_classification(repo, classifier, classification_input)
+    run_classification(repo, classifier, classification_input, reclassify)
 
 def aggregate_results():
     """
@@ -260,6 +285,7 @@ def main():
     parser.add_argument("--timeout", type=int, default=120, help="Timeout in seconds for processing each repository (default: 120)")
     parser.add_argument("--clean", action="store_true", help="Clean previous results/state before running (deletes entire results/ and .state/ directories)")
     parser.add_argument("--clean-cache", action="store_true", help="Clean cache before running (deletes entire .cache/ directory)")
+    parser.add_argument("--reclassify", action="store_true", help="Clear category and tags fields before re-running classification")
     parser.add_argument("--type", default="prs", choices=["prs", "commits"],
                        help="Type of mining to run (Step 1): 'prs' (PR-based bad->good) or 'commits' (commit-based pairs with successful builds). Default: prs")
     parser.add_argument("--classifier", default="simple", choices=["simple", "ai"],
@@ -334,7 +360,7 @@ def main():
     for repo in repos:
         try:
             with timeout_context(args.timeout, repo):
-                process_repo(repo, args.search_limit, args.results_limit, args.type, args.classifier, args.timeout)
+                process_repo(repo, args.search_limit, args.results_limit, args.type, args.classifier, args.timeout, args.reclassify)
         except TimeoutError as e:
             print(f"\n{'!'*60}")
             print(f"TIMEOUT: {e}")

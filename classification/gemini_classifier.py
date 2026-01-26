@@ -21,6 +21,34 @@ class GeminiClassifier:
             "Accept": "application/vnd.github.v3.diff"
         }
         self.gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={gemini_key}"
+        
+        # Load categories from files
+        self.categories = self._load_categories()
+    
+    def _load_categories(self) -> Dict[str, str]:
+        """Loads category definitions from .txt files in classification/categories/"""
+        categories = {}
+        categories_dir = os.path.join(os.path.dirname(__file__), "categories")
+        
+        if not os.path.exists(categories_dir):
+            print(f"Warning: Categories directory not found at {categories_dir}")
+            return categories
+        
+        try:
+            for filename in os.listdir(categories_dir):
+                if filename.endswith(".txt"):
+                    category_name = filename[:-4]  # Remove .txt extension
+                    filepath = os.path.join(categories_dir, filename)
+                    try:
+                        with open(filepath, 'r') as f:
+                            description = f.read().strip()
+                            categories[category_name] = description
+                    except Exception as e:
+                        print(f"Warning: Could not read category file {filename}: {e}")
+        except Exception as e:
+            print(f"Warning: Error reading categories directory: {e}")
+        
+        return categories
 
     def get_commit_diff(self, commit_sha: str) -> str:
         """Fetches the diff of a commit."""
@@ -45,7 +73,15 @@ class GeminiClassifier:
         """
         if not diff:
             return {"sub_category": "Unknown (No Diff)", "error": None}
-            
+        
+        if not self.categories:
+            return {"sub_category": None, "error": "No categories loaded"}
+        
+        # Build category descriptions dynamically
+        category_descriptions = []
+        for category_name, description in self.categories.items():
+            category_descriptions.append(f"**{category_name}**: {description}")
+        
         prompt_text = f"""
         Analyze the following commit to determine its sub-category.
         
@@ -55,14 +91,11 @@ class GeminiClassifier:
         Diff Snippet:
         {diff}
         
-        Classify this commit into one of these sub-categories:
-        - "Dependency Update" - Version updates, library changes
-        - "Bug Fix" - Fixing errors or issues
-        - "Feature" - Adding new functionality
-        - "Refactor" - Code restructuring without changing functionality
-        - "Other" - Doesn't fit other categories
+        Classify this commit into ONE of these categories:
         
-        Answer with ONLY the sub-category name from the list above.
+        {chr(10).join(category_descriptions)}
+        
+        Answer with ONLY the category name from the list above.
         """
         
         payload = {
@@ -77,17 +110,12 @@ class GeminiClassifier:
                 data = response.json()
                 try:
                     answer = data["candidates"][0]["content"]["parts"][0]["text"].strip()
-                    # Extract the sub-category from the response
-                    if "Dependency Update" in answer:
-                        return {"sub_category": "Dependency Update", "error": None}
-                    elif "Bug Fix" in answer:
-                        return {"sub_category": "Bug Fix", "error": None}
-                    elif "Feature" in answer:
-                        return {"sub_category": "Feature", "error": None}
-                    elif "Refactor" in answer:
-                        return {"sub_category": "Refactor", "error": None}
-                    else:
-                        return {"sub_category": "Other", "error": None}
+                    # Extract the sub-category from the response by checking against known categories
+                    for category_name in self.categories.keys():
+                        if category_name in answer:
+                            return {"sub_category": category_name, "error": None}
+                    # If no match, return Other as fallback
+                    return {"sub_category": "Other", "error": None}
                 except (KeyError, IndexError) as e:
                     error_msg = f"Error parsing Gemini response: {e}"
                     print(error_msg)
