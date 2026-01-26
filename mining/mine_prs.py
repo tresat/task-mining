@@ -6,6 +6,12 @@ import requests
 from typing import List, Dict, Optional, Generator, Any
 from .mine_common import load_env, ensure_directory, process_repo_list
 
+# Configuration constants
+CURSOR_DISPLAY_LENGTH = 20      # Number of characters to show in cursor display
+LARGE_CACHE_THRESHOLD = 200     # Cache size threshold for applying smart limits
+SEARCH_LIMIT_MULTIPLIER = 10    # Multiplier for auto search_limit (results_limit * this)
+CACHE_SIZE_THRESHOLD = 100      # Don't fetch from GitHub if cache >= this size
+
 # GraphQL Queries
 PR_QUERY = """
 query ($owner: String!, $name: String!, $cursor: String, $limit: Int!) {
@@ -246,9 +252,9 @@ class PRMiner:
             # If cache is large and no search_limit set, apply a reasonable limit
             # to avoid processing thousands of PRs
             effective_search_limit = search_limit
-            if not search_limit and results_limit and cache_size > 200:
-                # Process up to 10x the results_limit from cache
-                effective_search_limit = results_limit * 10
+            if not search_limit and results_limit and cache_size > LARGE_CACHE_THRESHOLD:
+                # Process up to SEARCH_LIMIT_MULTIPLIER times the results_limit from cache
+                effective_search_limit = results_limit * SEARCH_LIMIT_MULTIPLIER
                 print(f"Large cache detected. Will process up to {effective_search_limit} PRs from cache.")
             
             # Sort PR numbers to process in order
@@ -322,10 +328,10 @@ class PRMiner:
                 print(f"Reached search limit of {search_limit} PRs.")
                 return results
             
-            # Only fetch more from GitHub if cache was small (< 100 PRs)
+            # Only fetch more from GitHub if cache was small (< CACHE_SIZE_THRESHOLD PRs)
             # If we have a large cache but no results, the repo likely doesn't have many valid pairs
-            if cache_manager.size() < 100:
-                print(f"Cache has fewer than 100 PRs. Fetching more from GitHub...\n")
+            if cache_manager.size() < CACHE_SIZE_THRESHOLD:
+                print(f"Cache has fewer than {CACHE_SIZE_THRESHOLD} PRs. Fetching more from GitHub...\n")
             else:
                 print(f"Cache has {cache_manager.size()} PRs. Stopping search (found {len(results)} pairs total).")
                 return results
@@ -357,7 +363,7 @@ class PRMiner:
             }
             
             # Abbreviate cursor for display
-            cursor_display = f"{cursor[:20]}..." if cursor and len(cursor) > 20 else cursor
+            cursor_display = f"{cursor[:CURSOR_DISPLAY_LENGTH]}..." if cursor and len(cursor) > CURSOR_DISPLAY_LENGTH else cursor
             print(f"Fetching PRs from GitHub (cursor={cursor_display}, processed={processed_count})...")
             data = self._query(PR_QUERY, variables)
             
