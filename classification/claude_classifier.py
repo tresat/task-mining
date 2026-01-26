@@ -53,7 +53,7 @@ Answer with ONLY the category name from the list above."""
         
         try:
             response = self.client.messages.create(
-                model="claude-3-5-sonnet-20241022",
+                model="claude-haiku-4-5",
                 max_tokens=50,
                 temperature=0.3,
                 messages=[
