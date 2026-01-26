@@ -86,7 +86,17 @@ class TestProcessRepo(unittest.TestCase):
         mock_miner_class.return_value = mock_miner
         
         with tempfile.TemporaryDirectory() as tmpdir:
-            process_repo("owner/repo", "fake_token", 100, None, tmpdir, tmpdir, None, use_cache=True, allow_missing_status=False)
+            process_repo(
+                repo="owner/repo",
+                token="fake_token",
+                search_limit=100,
+                results_limit=None,
+                output_dir=tmpdir,
+                state_dir=tmpdir,
+                ref=None,
+                use_cache=True,
+                allow_missing_status=False
+            )
             
             # Verify miner was created with correct parameters (including allow_missing_status)
             mock_miner_class.assert_called_once_with("fake_token", "owner", "repo", allow_missing_status=False)
