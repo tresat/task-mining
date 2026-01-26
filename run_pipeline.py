@@ -125,6 +125,9 @@ def run_mining(repo, search_limit, results_limit, mining_type, output_dir, state
     
     return classification_input
 
+# Fields to clear during reclassification
+RECLASSIFY_FIELDS = ['category', 'tags']
+
 def run_classification(repo, classifier, classification_input, reclassify=False):
     """
     Run classification based on the specified classifier.
@@ -147,14 +150,17 @@ def run_classification(repo, classifier, classification_input, reclassify=False)
             
             # Clear classification fields
             for result in results:
-                result['category'] = None
-                result['tags'] = []
+                for field in RECLASSIFY_FIELDS:
+                    if field == 'tags':
+                        result[field] = []
+                    else:
+                        result[field] = None
             
             # Save the cleared results
             with open(classification_input, 'w') as f:
                 json.dump(results, f, indent=2)
             
-            print(f"Cleared category and tags fields for {len(results)} results in {classification_input}")
+            print(f"Cleared {', '.join(RECLASSIFY_FIELDS)} fields for {len(results)} results in {classification_input}")
         except Exception as e:
             print(f"Error clearing classification fields: {e}")
     

@@ -42,6 +42,11 @@ class GeminiClassifier:
                     try:
                         with open(filepath, 'r') as f:
                             description = f.read().strip()
+                            # Validate description: limit length and remove potentially harmful content
+                            if len(description) > 500:
+                                print(f"Warning: Description in {filename} exceeds 500 characters, truncating")
+                                description = description[:500]
+                            # Store sanitized description
                             categories[category_name] = description
                     except Exception as e:
                         print(f"Warning: Could not read category file {filename}: {e}")
