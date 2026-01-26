@@ -175,9 +175,9 @@ def prime_pr_cache(miner, cache_manager: CacheManager, max_items: int = MAX_CACH
             "limit": batch_size
         }
         
-        # Abbreviate cursor for display
-        cursor_display = f"{cursor[:CURSOR_DISPLAY_LENGTH]}..." if cursor and len(cursor) > CURSOR_DISPLAY_LENGTH else cursor
-        print(f"Fetching PR list from GitHub (cursor={cursor_display})...")
+        # Abbreviate cursor for display and show progress
+        cursor_display = f"{cursor[:CURSOR_DISPLAY_LENGTH]}" if cursor and len(cursor) > CURSOR_DISPLAY_LENGTH else cursor
+        print(f"Fetching PR list from GitHub (fetched={items_fetched}, cursor={cursor_display})...")
         data = miner._query(PR_QUERY, variables)
         
         if not data.get("data") or not data["data"].get("repository"):
@@ -269,9 +269,9 @@ def prime_commit_cache(miner, cache_manager: CacheManager, ref: str, max_items: 
             "limit": batch_size
         }
         
-        # Abbreviate cursor for display
-        cursor_display = f"{cursor[:CURSOR_DISPLAY_LENGTH]}..." if cursor and len(cursor) > CURSOR_DISPLAY_LENGTH else cursor
-        print(f"Fetching commit list from GitHub (cursor={cursor_display})...")
+        # Abbreviate cursor for display and show progress
+        cursor_display = f"{cursor[:CURSOR_DISPLAY_LENGTH]}" if cursor and len(cursor) > CURSOR_DISPLAY_LENGTH else cursor
+        print(f"Fetching commit list from GitHub (fetched={items_fetched}, cursor={cursor_display})...")
         data = miner._query(COMMITS_QUERY, variables)
         
         if not data.get("data") or not data["data"].get("repository"):

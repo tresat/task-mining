@@ -353,7 +353,7 @@ class CommitMiner:
             }
             
             # Abbreviate cursor for display
-            cursor_display = f"{cursor[:CURSOR_DISPLAY_LENGTH]}..." if cursor and len(cursor) > CURSOR_DISPLAY_LENGTH else cursor
+            cursor_display = f"{cursor[:CURSOR_DISPLAY_LENGTH]}" if cursor and len(cursor) > CURSOR_DISPLAY_LENGTH else cursor
             print(f"Fetching commits from GitHub (cursor={cursor_display}, processed={processed_count})...")
             data = self._query(COMMITS_QUERY, variables)
             
