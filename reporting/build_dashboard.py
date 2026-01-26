@@ -65,7 +65,7 @@ def generate_dashboard_html(raw_data):
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Task Mining Dashboard</title>
+    <title>GitHub Update Mining</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
@@ -152,6 +152,26 @@ def generate_dashboard_html(raw_data):
 
         select:hover {{
             border-color: var(--accent);
+        }}
+
+        input[type="text"] {{
+            background-color: var(--card-bg);
+            color: var(--text-primary);
+            border: 1px solid var(--border);
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            font-size: 1rem;
+            min-width: 300px;
+        }}
+
+        input[type="text"]:focus {{
+            outline: none;
+            border-color: var(--accent);
+        }}
+
+        input[type="text"]::placeholder {{
+            color: var(--text-secondary);
+            opacity: 0.7;
         }}
 
         .dashboard-grid {{
@@ -398,6 +418,13 @@ def generate_dashboard_html(raw_data):
         .badge-tag {{
             background-color: rgba(56, 189, 248, 0.2);
             color: var(--accent);
+            cursor: pointer;
+            transition: all 0.2s;
+        }}
+
+        .badge-tag:hover {{
+            background-color: rgba(56, 189, 248, 0.3);
+            transform: scale(1.05);
         }}
 
         .result-meta {{
@@ -480,8 +507,8 @@ def generate_dashboard_html(raw_data):
 <body>
     <div class="container">
         <header>
-            <h1>Task Mining Dashboard</h1>
-            <p class="subtitle">Analyzed commit pairs and dependency updates from GitHub repositories</p>
+            <h1>GitHub Update Mining</h1>
+            <p class="subtitle">Interactive analysis of project modifications</p>
         </header>
 
         <div class="controls">
@@ -490,6 +517,10 @@ def generate_dashboard_html(raw_data):
                 <select id="repoFilter" onchange="updateDisplay()">
                     <option value="ALL">ALL</option>
                 </select>
+            </div>
+            <div class="control-group">
+                <label for="searchInput">Search:</label>
+                <input type="text" id="searchInput" placeholder="Search in titles, repos, tags..." oninput="updateDisplay()">
             </div>
         </div>
 
@@ -545,9 +576,10 @@ def generate_dashboard_html(raw_data):
 
         let chart = null;
         let currentRepoFilter = 'ALL';
-        let currentTagFilter = null;
+        let selectedTags = new Set();
         let currentCategoryFilter = null;
         let selectedItems = new Set();
+        let currentSearchText = '';
 
         function initializeRepoFilter() {{
             const repos = new Set(rawData.map(r => r.repo_url));
@@ -574,9 +606,9 @@ def generate_dashboard_html(raw_data):
             }}
             
             // Filter by tag
-            if (currentTagFilter) {{
+            if (selectedTags.size > 0) {{
                 filtered = filtered.filter(r => 
-                    r.tags && Array.isArray(r.tags) && r.tags.includes(currentTagFilter)
+                    r.tags && Array.isArray(r.tags) && r.tags.some(tag => selectedTags.has(tag))
                 );
             }}
             
@@ -587,11 +619,46 @@ def generate_dashboard_html(raw_data):
                 );
             }}
             
+            // Filter by search text
+            if (currentSearchText) {{
+                const searchLower = currentSearchText.toLowerCase();
+                filtered = filtered.filter(r => {{
+                    // Search in title (to_msg)
+                    const title = (r.to_msg || r.from_msg || '').toLowerCase();
+                    if (title.includes(searchLower)) return true;
+                    
+                    // Search in repo name
+                    const repoName = (r.repo_url || '').toLowerCase();
+                    if (repoName.includes(searchLower)) return true;
+                    
+                    // Search in category
+                    const category = (r.category || '').toLowerCase();
+                    if (category.includes(searchLower)) return true;
+                    
+                    // Search in tags
+                    if (r.tags && Array.isArray(r.tags)) {{
+                        const tagMatch = r.tags.some(tag => tag.toLowerCase().includes(searchLower));
+                        if (tagMatch) return true;
+                    }}
+                    
+                    // Search in files
+                    if (r.files_changed && Array.isArray(r.files_changed)) {{
+                        const fileMatch = r.files_changed.some(f => 
+                            (f.filename || '').toLowerCase().includes(searchLower)
+                        );
+                        if (fileMatch) return true;
+                    }}
+                    
+                    return false;
+                }});
+            }}
+            
             return filtered;
         }}
 
         function updateDisplay() {{
             currentRepoFilter = document.getElementById('repoFilter').value;
+            currentSearchText = document.getElementById('searchInput').value.trim();
             // Clear selections when filters change
             selectedItems.clear();
             updateStats();
@@ -602,14 +669,14 @@ def generate_dashboard_html(raw_data):
         }}
 
         function clearFilters() {{
-            currentTagFilter = null;
+            selectedTags.clear();
             currentCategoryFilter = null;
             updateDisplay();
         }}
 
         function updateClearFiltersButton() {{
             const clearBtn = document.getElementById('clearFilters');
-            if (currentTagFilter || currentCategoryFilter) {{
+            if (selectedTags.size > 0 || currentCategoryFilter) {{
                 clearBtn.classList.remove('hidden');
             }} else {{
                 clearBtn.classList.add('hidden');
@@ -617,10 +684,10 @@ def generate_dashboard_html(raw_data):
         }}
 
         function filterByTag(tag) {{
-            if (currentTagFilter === tag) {{
-                currentTagFilter = null;
+            if (selectedTags.has(tag)) {{
+                selectedTags.delete(tag);
             }} else {{
-                currentTagFilter = tag;
+                selectedTags.add(tag);
                 currentCategoryFilter = null; // Clear category filter when tag is selected
             }}
             updateDisplay();
@@ -631,7 +698,7 @@ def generate_dashboard_html(raw_data):
                 currentCategoryFilter = null;
             }} else {{
                 currentCategoryFilter = category;
-                currentTagFilter = null; // Clear tag filter when category is selected
+                selectedTags.clear(); // Clear tag filters when category is selected
             }}
             updateDisplay();
         }}
@@ -657,7 +724,7 @@ def generate_dashboard_html(raw_data):
             }}
             
             tagsList.innerHTML = sortedTags.map(tag => {{
-                const activeClass = currentTagFilter === tag ? ' active' : '';
+                const activeClass = selectedTags.has(tag) ? ' active' : '';
                 return `<span class="tag-filter${{activeClass}}" onclick="filterByTag('${{tag}}')">${{tag}}</span>`;
             }}).join('');
         }}
@@ -798,7 +865,7 @@ def generate_dashboard_html(raw_data):
                 
                 if (result.tags && Array.isArray(result.tags) && result.tags.length > 0) {{
                     result.tags.forEach(tag => {{
-                        badges += `<span class="badge badge-tag">${{tag}}</span>`;
+                        badges += `<span class="badge badge-tag" onclick="event.stopPropagation(); filterByTag('${{tag}}')">${{tag}}</span>`;
                     }});
                 }}
                 
@@ -846,10 +913,11 @@ def generate_dashboard_html(raw_data):
             document.getElementById('filterInfo').textContent = `Showing ${{filteredData.length}} result(s)`;
             
             // Add filter status
-            if (currentTagFilter || currentCategoryFilter) {{
+            if (selectedTags.size > 0 || currentCategoryFilter) {{
                 let filterText = '';
-                if (currentTagFilter) {{
-                    filterText = ` (filtered by tag: ${{currentTagFilter}})`;
+                if (selectedTags.size > 0) {{
+                    const tagsList = Array.from(selectedTags).join(', ');
+                    filterText = ` (filtered by tags: ${{tagsList}})`;
                 }} else if (currentCategoryFilter) {{
                     filterText = ` (filtered by category: ${{currentCategoryFilter}})`;
                 }}
