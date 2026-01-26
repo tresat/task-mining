@@ -8,8 +8,6 @@ from .mine_common import load_env, ensure_directory, process_repo_list
 
 # Configuration constants
 CURSOR_DISPLAY_LENGTH = 20      # Number of characters to show in cursor display
-LARGE_CACHE_THRESHOLD = 200     # Cache size threshold for applying smart limits
-SEARCH_LIMIT_MULTIPLIER = 10    # Multiplier for auto search_limit (results_limit * this)
 CACHE_SIZE_THRESHOLD = 100      # Don't fetch from GitHub if cache >= this size
 
 # GraphQL Queries
@@ -249,14 +247,6 @@ class PRMiner:
             print(f"\nMining from cache ({cache_size} PRs available)...")
             cached_prs = cache_manager.get_all()
             
-            # If cache is large and no search_limit set, apply a reasonable limit
-            # to avoid processing thousands of PRs
-            effective_search_limit = search_limit
-            if not search_limit and results_limit and cache_size > LARGE_CACHE_THRESHOLD:
-                # Process up to SEARCH_LIMIT_MULTIPLIER times the results_limit from cache
-                effective_search_limit = results_limit * SEARCH_LIMIT_MULTIPLIER
-                print(f"Large cache detected. Will process up to {effective_search_limit} PRs from cache.")
-            
             # Sort PR numbers to process in order
             pr_numbers = sorted([int(k) for k in cached_prs.keys()], reverse=True)
             
@@ -266,9 +256,9 @@ class PRMiner:
                     print(f"Reached results limit of {results_limit} pairs.")
                     return results
                 
-                # Check search limit (including effective limit)
-                if effective_search_limit and processed_count >= effective_search_limit:
-                    print(f"Reached search limit of {effective_search_limit} PRs.")
+                # Check search limit
+                if search_limit and processed_count >= search_limit:
+                    print(f"Reached search limit of {search_limit} PRs.")
                     return results
                 
                 pr_data = cached_prs[str(pr_number)]
@@ -500,7 +490,12 @@ def process_repo(repo: str, token: str, search_limit: Optional[int], results_lim
         limit_desc.append(f"results limit: {results_limit} pairs")
     print(f"Mining {repo} ({', '.join(limit_desc) if limit_desc else 'no limits'})...")
     
-    miner.mine(search_limit, results_limit, output_file, state_file, cache_manager)
+    results = miner.mine(search_limit, results_limit, output_file, state_file, cache_manager)
+    
+    # Check if fewer results than requested were found
+    if results_limit and len(results) < results_limit:
+        print(f"⚠ Only found {len(results)} pair(s) for {repo} (requested {results_limit})")
+    
     print(f"Mining complete for {repo}.")
 
 def main():
