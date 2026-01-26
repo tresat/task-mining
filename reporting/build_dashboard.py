@@ -433,12 +433,49 @@ def generate_dashboard_html(raw_data):
             color: var(--text-secondary);
             font-size: 0.9rem;
             margin-bottom: 0.75rem;
+            align-items: flex-start;
+        }}
+
+        .result-meta-left {{
+            display: flex;
+            gap: 1.5rem;
+            flex-wrap: wrap;
+            flex: 1;
+        }}
+
+        .result-meta-right {{
+            margin-left: auto;
+            text-align: right;
+            max-width: 40%;
         }}
 
         .result-meta-item {{
             display: flex;
             align-items: center;
             gap: 0.25rem;
+        }}
+
+        .files-list {{
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+        }}
+
+        .files-list-title {{
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+            color: var(--text-secondary);
+        }}
+
+        .file-item {{
+            margin-bottom: 0.1rem;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }}
+
+        .more-files {{
+            font-style: italic;
+            opacity: 0.7;
         }}
 
         .result-message {{
@@ -871,8 +908,22 @@ def generate_dashboard_html(raw_data):
                 
                 // Build files changed info
                 let filesInfo = '';
+                let filesMetaInfo = '';
                 if (result.files_changed && result.files_changed.length > 0) {{
-                    filesInfo = `<div class="files-changed">Files changed: ${{result.files_changed.map(f => f.filename).join(', ')}}</div>`;
+                    const maxFilesToShow = 3;
+                    const filesToDisplay = result.files_changed.slice(0, maxFilesToShow);
+                    const remainingCount = result.files_changed.length - maxFilesToShow;
+                    
+                    filesMetaInfo = '<div class="files-list">';
+                    filesMetaInfo += '<div class="files-list-title">Files changed:</div>';
+                    filesToDisplay.forEach(f => {{
+                        const fileName = f.filename || f;
+                        filesMetaInfo += `<div class="file-item">${{fileName}}</div>`;
+                    }});
+                    if (remainingCount > 0) {{
+                        filesMetaInfo += `<div class="more-files">+${{remainingCount}} more...</div>`;
+                    }}
+                    filesMetaInfo += '</div>';
                 }}
                 
                 // Build error message if present (collapsible for long errors)
@@ -899,9 +950,12 @@ def generate_dashboard_html(raw_data):
                             </div>
                         </div>
                         <div class="result-meta">
-                            <span class="result-meta-item">📦 ${{repoName}}</span>
-                            ${{prLink ? `<span class="result-meta-item">PR ${{prLink}}</span>` : ''}}
-                            ${{result.to_date ? `<span class="result-meta-item">📅 ${{new Date(result.to_date).toLocaleDateString()}}</span>` : ''}}
+                            <div class="result-meta-left">
+                                <span class="result-meta-item">📦 ${{repoName}}</span>
+                                ${{prLink ? `<span class="result-meta-item">PR ${{prLink}}</span>` : ''}}
+                                ${{result.to_date ? `<span class="result-meta-item">📅 ${{new Date(result.to_date).toLocaleDateString()}}</span>` : ''}}
+                            </div>
+                            ${{filesMetaInfo ? `<div class="result-meta-right">${{filesMetaInfo}}</div>` : ''}}
                         </div>
                         <div class="badges">${{badges}}</div>
                         ${{filesInfo}}
