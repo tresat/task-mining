@@ -9,67 +9,14 @@ import sys
 # Add parent directory to path to import from mining
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 from mining.mine_common import load_env
+from classification.base_ai_classifier import BaseAIClassifier
 
-class GeminiClassifier:
+class GeminiClassifier(BaseAIClassifier):
     def __init__(self, github_token: str, gemini_key: str, repo_owner: str, repo_name: str):
-        self.github_token = github_token
-        self.gemini_key = gemini_key
-        self.owner = repo_owner
-        self.name = repo_name
-        self.headers = {
-            "Authorization": f"Bearer {github_token}",
-            "Accept": "application/vnd.github.v3.diff"
-        }
+        super().__init__(github_token, gemini_key, repo_owner, repo_name)
         self.gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={gemini_key}"
-        
-        # Load categories from files
-        self.categories = self._load_categories()
     
-    def _load_categories(self) -> Dict[str, str]:
-        """Loads category definitions from .txt files in classification/categories/"""
-        categories = {}
-        categories_dir = os.path.join(os.path.dirname(__file__), "categories")
-        
-        if not os.path.exists(categories_dir):
-            print(f"Warning: Categories directory not found at {categories_dir}")
-            return categories
-        
-        try:
-            for filename in os.listdir(categories_dir):
-                if filename.endswith(".txt"):
-                    category_name = filename[:-4]  # Remove .txt extension
-                    filepath = os.path.join(categories_dir, filename)
-                    try:
-                        with open(filepath, 'r') as f:
-                            description = f.read().strip()
-                            # Validate description: limit length and remove potentially harmful content
-                            if len(description) > 500:
-                                print(f"Warning: Description in {filename} exceeds 500 characters, truncating")
-                                description = description[:500]
-                            # Store sanitized description
-                            categories[category_name] = description
-                    except Exception as e:
-                        print(f"Warning: Could not read category file {filename}: {e}")
-        except Exception as e:
-            print(f"Warning: Error reading categories directory: {e}")
-        
-        return categories
-
-    def get_commit_diff(self, commit_sha: str) -> str:
-        """Fetches the diff of a commit."""
-        url = f"https://api.github.com/repos/{self.owner}/{self.name}/commits/{commit_sha}"
-        try:
-            response = requests.get(url, headers=self.headers, timeout=15)
-            if response.status_code == 200:
-                return response.text[:10000]  # Truncate
-            else:
-                print(f"Failed to fetch diff for {commit_sha}: {response.status_code}")
-                return ""
-        except Exception as e:
-            print(f"Error fetching diff for {commit_sha}: {e}")
-            return ""
-
-    def classify_with_gemini(self, message: str, diff: str) -> dict:
+    def _call_ai_api(self, message: str, diff: str) -> dict:
         """Asks Gemini for sub-categorization using REST API.
         
         Returns:
@@ -138,6 +85,38 @@ class GeminiClassifier:
             error_msg = f"Request error: {str(e)}"
             print(f"Gemini Request Error: {e}")
             return {"sub_category": None, "error": error_msg}
+    
+    def classify(self, pair: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Main classification method for GeminiClassifier.
+        
+        Classifies using AI and handles tagging.
+        """
+        to_commit = pair.get("to_commit") or pair.get("good_commit")
+        msg = pair.get("to_msg") or pair.get("good_msg")
+        
+        # Get commit diff
+        diff = self.get_commit_diff(to_commit)
+        
+        # Call AI API
+        result = self._call_ai_api(msg, diff)
+        ai_tag = result["sub_category"]
+        error = result["error"]
+        
+        # Add AI tag to tags list if it's not None
+        if ai_tag:
+            if "tags" not in pair or pair["tags"] is None:
+                pair["tags"] = []
+            if ai_tag not in pair["tags"]:
+                pair["tags"].append(ai_tag)
+        
+        # If there was an error, set category to "Unknown"
+        if error:
+            pair["category"] = "Unknown"
+        
+        pair["error"] = error
+        
+        return pair
 
     def run(self, input_file: str):
         """Classifies pairs in-place, updating the sub_category field."""
@@ -175,8 +154,8 @@ class GeminiClassifier:
             diff = self.get_commit_diff(to_commit)
             
             print(f"  Asking Gemini...")
-            result = self.classify_with_gemini(msg, diff)
-            ai_tag = result["sub_category"]  # Still using sub_category key in return for now
+            result = self._call_ai_api(msg, diff)
+            ai_tag = result["sub_category"]
             error = result["error"]
             print(f"  Assigned Category: {ai_tag}")
             
@@ -186,7 +165,7 @@ class GeminiClassifier:
                     pair["tags"] = []
                 if ai_tag not in pair["tags"]:
                     pair["tags"].append(ai_tag)
-                print(f"  Tagged: {', '.join(pair['tags'])}")
+                print(f"  Assigned Tags: {', '.join(pair['tags'])}")
             
             # If there was an error, set category to "Unknown"
             if error:

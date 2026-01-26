@@ -10,21 +10,15 @@ import re
 # Add parent directory to path to import from mining
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 from mining.mine_common import load_env
+from classification.base_classifier import BaseClassifier
 
-class SimpleClassifier:
+class SimpleClassifier(BaseClassifier):
     """
     Simple classifier that categorizes changes based on dependency file modifications.
     Only tags things as Dependency Changes vs. Others.
     """
     def __init__(self, token: str, repo_owner: str, repo_name: str):
-        self.token = token
-        self.owner = repo_owner
-        self.name = repo_name
-        self.headers = {
-            "Authorization": f"Bearer {token}",
-            "Accept": "application/vnd.github.v3+json"
-        }
-        self.api_url = "https://api.github.com"
+        super().__init__(token, repo_owner, repo_name)
 
     def get_commit_diff(self, commit_sha: str) -> Dict[str, Any]:
         """Fetches the diff for a commit using REST API."""
@@ -40,33 +34,6 @@ class SimpleClassifier:
             print(f"Error fetching commit {commit_sha}: {e}")
             return {}
 
-    def is_single_line_change(self, commit_diff: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """
-        Checks if the commit changes only a single line in a dependency file.
-        Returns the file info if valid, None otherwise.
-        """
-        files = commit_diff.get("files", [])
-        
-        # Must have exactly one file changed
-        if len(files) != 1:
-            return None
-        
-        file = files[0]
-        filename = file.get("filename", "")
-        
-        # Check if it's a dependency file
-        valid_files = ["build.gradle", "build.gradle.kts", "libs.versions.toml"]
-        if not any(filename.endswith(vf) for vf in valid_files):
-            return None
-        
-        # Check if only one line changed (1 addition, 1 deletion)
-        additions = file.get("additions", 0)
-        deletions = file.get("deletions", 0)
-        
-        if additions != 1 or deletions != 1:
-            return None
-        
-        return file
 
     def _is_content_line(self, line: str) -> bool:
         """
@@ -257,6 +224,50 @@ class SimpleClassifier:
                         has_dependency_changes = True
         
         return has_dependency_changes
+    
+    def check_dependencies(self, pair: Dict[str, Any]) -> bool:
+        """
+        Check if the change is dependency-related using heuristic logic.
+        
+        Checks for:
+        - Changes to libs.versions.toml
+        - Changes within dependencies {} blocks in gradle files
+        """
+        to_commit = pair.get("to_commit") or pair.get("good_commit")
+        commit_data = self.get_commit_diff(to_commit)
+        files = commit_data.get("files", [])
+        
+        for file_obj in files:
+            filename = file_obj.get("filename", "")
+            patch = file_obj.get("patch", "")
+            
+            if "libs.versions.toml" in filename:
+                return True
+            elif filename.endswith("build.gradle") or filename.endswith("build.gradle.kts"):
+                if self.check_dependencies_block(patch):
+                    return True
+        
+        return False
+    
+    def check_version_update(self, pair: Dict[str, Any], file_info: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+        """
+        Check if the change is a version update using version comparison logic.
+        
+        Returns version change information if valid, None otherwise.
+        """
+        if not file_info:
+            return None
+        
+        patch = file_info.get("patch", "")
+        return self.extract_version_change(patch)
+
+    def classify(self, pair: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Main classification method for SimpleClassifier.
+        
+        Alias for classify_pair to maintain compatibility.
+        """
+        return self.classify_pair(pair)
 
     def classify_pair(self, pair: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -292,21 +303,21 @@ class SimpleClassifier:
             if "one-line" not in tags:
                 tags.append("one-line")
             
-        # Check for version increase
-        patch = file_info.get("patch", "")
-        version_change = self.extract_version_change(patch)
-        if version_change:
-            if "version-update" not in tags:
-                tags.append("version-update")
-                
-        # Populate files_changed if empty
-        if not pair.get("files_changed"):
-            pair["files_changed"] = [{
-                "filename": file_info.get("filename"),
-                "line_number": version_change["line_number"],
-                "from_line_contents": version_change["from_line"],
-                "to_line_contents": version_change["to_line"]
-            }]
+            # Check for version increase
+            patch = file_info.get("patch", "")
+            version_change = self.extract_version_change(patch)
+            if version_change:
+                if "version-update" not in tags:
+                    tags.append("version-update")
+                    
+                # Populate files_changed if empty
+                if not pair.get("files_changed"):
+                    pair["files_changed"] = [{
+                        "filename": file_info.get("filename"),
+                        "line_number": version_change["line_number"],
+                        "from_line_contents": version_change["from_line"],
+                        "to_line_contents": version_change["to_line"]
+                    }]
         
         for file_obj in files:
             filename = file_obj.get("filename", "")
