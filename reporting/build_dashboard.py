@@ -906,8 +906,7 @@ def generate_dashboard_html(raw_data):
                     }});
                 }}
                 
-                // Build files changed info
-                let filesInfo = '';
+                // Build files changed info for metadata section
                 let filesMetaInfo = '';
                 if (result.files_changed && result.files_changed.length > 0) {{
                     const maxFilesToShow = 3;
@@ -958,7 +957,6 @@ def generate_dashboard_html(raw_data):
                             ${{filesMetaInfo ? `<div class="result-meta-right">${{filesMetaInfo}}</div>` : ''}}
                         </div>
                         <div class="badges">${{badges}}</div>
-                        ${{filesInfo}}
                         ${{errorInfo}}
                     </div>
                 `;
