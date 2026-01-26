@@ -65,7 +65,7 @@ def generate_dashboard_html(raw_data):
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Task Mining Dashboard</title>
+    <title>GitHub Update Mining</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
@@ -154,6 +154,26 @@ def generate_dashboard_html(raw_data):
             border-color: var(--accent);
         }}
 
+        input[type="text"] {{
+            background-color: var(--card-bg);
+            color: var(--text-primary);
+            border: 1px solid var(--border);
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            font-size: 1rem;
+            min-width: 300px;
+        }}
+
+        input[type="text"]:focus {{
+            outline: none;
+            border-color: var(--accent);
+        }}
+
+        input[type="text"]::placeholder {{
+            color: var(--text-secondary);
+            opacity: 0.7;
+        }}
+
         .dashboard-grid {{
             display: grid;
             grid-template-columns: 1fr 2fr;
@@ -196,21 +216,85 @@ def generate_dashboard_html(raw_data):
 
         .stat-item {{
             text-align: center;
-            padding: 1rem;
-            border-radius: 0.75rem;
+            padding: 0.5rem;
+            border-radius: 0.5rem;
             background: rgba(255, 255, 255, 0.05);
         }}
 
         .stat-value {{
-            font-size: 2.5rem;
+            font-size: 1.5rem;
             font-weight: 700;
             color: var(--accent);
         }}
 
         .stat-label {{
-            font-size: 0.9rem;
+            font-size: 0.8rem;
             color: var(--text-secondary);
-            margin-top: 0.25rem;
+            margin-top: 0.1rem;
+        }}
+
+        .tags-section {{
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid var(--border);
+        }}
+
+        .tags-title {{
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 0.75rem;
+        }}
+
+        .tags-list {{
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }}
+
+        .tag-filter {{
+            padding: 0.4rem 0.8rem;
+            border-radius: 0.375rem;
+            font-size: 0.85rem;
+            font-weight: 600;
+            background-color: rgba(56, 189, 248, 0.2);
+            color: var(--accent);
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 1px solid transparent;
+        }}
+
+        .tag-filter:hover {{
+            background-color: rgba(56, 189, 248, 0.3);
+            border-color: var(--accent);
+        }}
+
+        .tag-filter.active {{
+            background-color: var(--accent);
+            color: var(--bg-color);
+        }}
+
+        .clear-filters {{
+            margin-top: 0.75rem;
+            padding: 0.4rem 0.8rem;
+            border-radius: 0.375rem;
+            font-size: 0.85rem;
+            font-weight: 600;
+            background-color: rgba(248, 113, 113, 0.2);
+            color: #f87171;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 1px solid transparent;
+            display: inline-block;
+        }}
+
+        .clear-filters:hover {{
+            background-color: rgba(248, 113, 113, 0.3);
+            border-color: #f87171;
+        }}
+
+        .clear-filters.hidden {{
+            display: none;
         }}
 
         .results-section {{
@@ -233,7 +317,32 @@ def generate_dashboard_html(raw_data):
             color: var(--text-secondary);
         }}
 
+        .download-btn {{
+            padding: 0.6rem 1.2rem;
+            border-radius: 0.5rem;
+            font-size: 0.95rem;
+            font-weight: 600;
+            background-color: var(--accent);
+            color: var(--bg-color);
+            cursor: pointer;
+            transition: all 0.2s;
+            border: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }}
+
+        .download-btn:hover {{
+            background-color: var(--accent-hover);
+        }}
+
+        .download-btn:disabled {{
+            opacity: 0.5;
+            cursor: not-allowed;
+        }}
+
         .result-card {{
+            position: relative;
             background-color: var(--card-bg);
             border: 1px solid var(--border);
             border-radius: 0.75rem;
@@ -252,6 +361,23 @@ def generate_dashboard_html(raw_data):
             justify-content: space-between;
             align-items: start;
             margin-bottom: 1rem;
+            gap: 1rem;
+        }}
+
+        .result-checkbox {{
+            position: relative;
+            top: 0.25rem;
+            width: 1.2rem;
+            height: 1.2rem;
+            cursor: pointer;
+            accent-color: var(--accent);
+        }}
+
+        .result-title-wrapper {{
+            display: flex;
+            align-items: start;
+            gap: 0.75rem;
+            flex: 1;
         }}
 
         .result-title {{
@@ -292,6 +418,13 @@ def generate_dashboard_html(raw_data):
         .badge-tag {{
             background-color: rgba(56, 189, 248, 0.2);
             color: var(--accent);
+            cursor: pointer;
+            transition: all 0.2s;
+        }}
+
+        .badge-tag:hover {{
+            background-color: rgba(56, 189, 248, 0.3);
+            transform: scale(1.05);
         }}
 
         .result-meta {{
@@ -300,12 +433,49 @@ def generate_dashboard_html(raw_data):
             color: var(--text-secondary);
             font-size: 0.9rem;
             margin-bottom: 0.75rem;
+            align-items: flex-start;
+        }}
+
+        .result-meta-left {{
+            display: flex;
+            gap: 1.5rem;
+            flex-wrap: wrap;
+            flex: 1;
+        }}
+
+        .result-meta-right {{
+            margin-left: auto;
+            text-align: right;
+            max-width: 40%;
         }}
 
         .result-meta-item {{
             display: flex;
             align-items: center;
             gap: 0.25rem;
+        }}
+
+        .files-list {{
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+        }}
+
+        .files-list-title {{
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+            color: var(--text-secondary);
+        }}
+
+        .file-item {{
+            margin-bottom: 0.1rem;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }}
+
+        .more-files {{
+            font-style: italic;
+            opacity: 0.7;
         }}
 
         .result-message {{
@@ -374,8 +544,8 @@ def generate_dashboard_html(raw_data):
 <body>
     <div class="container">
         <header>
-            <h1>Task Mining Dashboard</h1>
-            <p class="subtitle">Analyzed commit pairs and dependency updates from GitHub repositories</p>
+            <h1>GitHub Update Mining</h1>
+            <p class="subtitle">Interactive analysis of project modifications</p>
         </header>
 
         <div class="controls">
@@ -386,11 +556,8 @@ def generate_dashboard_html(raw_data):
                 </select>
             </div>
             <div class="control-group">
-                <label for="groupBy">Group By:</label>
-                <select id="groupBy" onchange="updateDisplay()">
-                    <option value="category">Category</option>
-                    <option value="tags">Tags</option>
-                </select>
+                <label for="searchInput">Search:</label>
+                <input type="text" id="searchInput" placeholder="Search in titles, repos, tags..." oninput="updateDisplay()">
             </div>
         </div>
 
@@ -411,6 +578,11 @@ def generate_dashboard_html(raw_data):
                         <div class="stat-label">Repositories</div>
                     </div>
                 </div>
+                <div class="tags-section">
+                    <div class="tags-title">Filter by Tags</div>
+                    <div class="tags-list" id="tagsList"></div>
+                    <div class="clear-filters hidden" id="clearFilters" onclick="clearFilters()">Clear Filters</div>
+                </div>
             </div>
 
             <div class="card">
@@ -424,7 +596,13 @@ def generate_dashboard_html(raw_data):
         <div class="results-section">
             <div class="section-header">
                 <h2 class="section-title">Results</h2>
-                <span class="filter-info" id="filterInfo"></span>
+                <div style="display: flex; align-items: center; gap: 1rem;">
+                    <span class="filter-info" id="filterInfo"></span>
+                    <button class="download-btn" id="downloadBtn" onclick="downloadSelected()" disabled>
+                        <span>📥</span>
+                        <span id="downloadBtnText">Download Selected</span>
+                    </button>
+                </div>
             </div>
             <div id="resultsContainer"></div>
         </div>
@@ -434,8 +612,11 @@ def generate_dashboard_html(raw_data):
         const rawData = {raw_data_json};
 
         let chart = null;
-        let currentGroupBy = 'category';
         let currentRepoFilter = 'ALL';
+        let selectedTags = new Set();
+        let currentCategoryFilter = null;
+        let selectedItems = new Set();
+        let currentSearchText = '';
 
         function initializeRepoFilter() {{
             const repos = new Set(rawData.map(r => r.repo_url));
@@ -454,18 +635,135 @@ def generate_dashboard_html(raw_data):
         }}
 
         function getFilteredData() {{
-            if (currentRepoFilter === 'ALL') {{
-                return rawData;
+            let filtered = rawData;
+            
+            // Filter by repository
+            if (currentRepoFilter !== 'ALL') {{
+                filtered = filtered.filter(r => r.repo_url === currentRepoFilter);
             }}
-            return rawData.filter(r => r.repo_url === currentRepoFilter);
+            
+            // Filter by tag
+            if (selectedTags.size > 0) {{
+                filtered = filtered.filter(r => 
+                    r.tags && Array.isArray(r.tags) && r.tags.some(tag => selectedTags.has(tag))
+                );
+            }}
+            
+            // Filter by category
+            if (currentCategoryFilter) {{
+                filtered = filtered.filter(r => 
+                    (r.category || 'Other') === currentCategoryFilter
+                );
+            }}
+            
+            // Filter by search text
+            if (currentSearchText) {{
+                const searchLower = currentSearchText.toLowerCase();
+                filtered = filtered.filter(r => {{
+                    // Search in title (to_msg)
+                    const title = (r.to_msg || r.from_msg || '').toLowerCase();
+                    if (title.includes(searchLower)) return true;
+                    
+                    // Search in repo name
+                    const repoName = (r.repo_url || '').toLowerCase();
+                    if (repoName.includes(searchLower)) return true;
+                    
+                    // Search in category
+                    const category = (r.category || '').toLowerCase();
+                    if (category.includes(searchLower)) return true;
+                    
+                    // Search in tags
+                    if (r.tags && Array.isArray(r.tags)) {{
+                        const tagMatch = r.tags.some(tag => tag.toLowerCase().includes(searchLower));
+                        if (tagMatch) return true;
+                    }}
+                    
+                    // Search in files
+                    if (r.files_changed && Array.isArray(r.files_changed)) {{
+                        const fileMatch = r.files_changed.some(f => 
+                            (f.filename || '').toLowerCase().includes(searchLower)
+                        );
+                        if (fileMatch) return true;
+                    }}
+                    
+                    return false;
+                }});
+            }}
+            
+            return filtered;
         }}
 
         function updateDisplay() {{
-            currentGroupBy = document.getElementById('groupBy').value;
             currentRepoFilter = document.getElementById('repoFilter').value;
+            currentSearchText = document.getElementById('searchInput').value.trim();
+            // Clear selections when filters change
+            selectedItems.clear();
             updateStats();
+            updateTagsList();
             updateChart();
             displayResults();
+            updateClearFiltersButton();
+        }}
+
+        function clearFilters() {{
+            selectedTags.clear();
+            currentCategoryFilter = null;
+            updateDisplay();
+        }}
+
+        function updateClearFiltersButton() {{
+            const clearBtn = document.getElementById('clearFilters');
+            if (selectedTags.size > 0 || currentCategoryFilter) {{
+                clearBtn.classList.remove('hidden');
+            }} else {{
+                clearBtn.classList.add('hidden');
+            }}
+        }}
+
+        function filterByTag(tag) {{
+            if (selectedTags.has(tag)) {{
+                selectedTags.delete(tag);
+            }} else {{
+                selectedTags.add(tag);
+                currentCategoryFilter = null; // Clear category filter when tag is selected
+            }}
+            updateDisplay();
+        }}
+
+        function filterByCategory(category) {{
+            if (currentCategoryFilter === category) {{
+                currentCategoryFilter = null;
+            }} else {{
+                currentCategoryFilter = category;
+                selectedTags.clear(); // Clear tag filters when category is selected
+            }}
+            updateDisplay();
+        }}
+
+        function updateTagsList() {{
+            // Get all unique tags from current repository filter
+            const filteredByRepo = currentRepoFilter === 'ALL' ? rawData : 
+                rawData.filter(r => r.repo_url === currentRepoFilter);
+            
+            const tagsSet = new Set();
+            filteredByRepo.forEach(r => {{
+                if (r.tags && Array.isArray(r.tags)) {{
+                    r.tags.forEach(tag => tagsSet.add(tag));
+                }}
+            }});
+            
+            const tagsList = document.getElementById('tagsList');
+            const sortedTags = Array.from(tagsSet).sort();
+            
+            if (sortedTags.length === 0) {{
+                tagsList.innerHTML = '<span style="color: var(--text-secondary); font-size: 0.85rem;">No tags available</span>';
+                return;
+            }}
+            
+            tagsList.innerHTML = sortedTags.map(tag => {{
+                const activeClass = selectedTags.has(tag) ? ' active' : '';
+                return `<span class="tag-filter${{activeClass}}" onclick="filterByTag('${{tag}}')">${{tag}}</span>`;
+            }}).join('');
         }}
 
         function updateStats() {{
@@ -473,23 +771,15 @@ def generate_dashboard_html(raw_data):
             const totalCount = filteredData.length;
             const repos = new Set(filteredData.map(r => r.repo_url)).size;
             
-            let groups = new Set();
-            if (currentGroupBy === 'category') {{
-                filteredData.forEach(r => {{
-                    if (r.category) {{
-                        groups.add(r.category);
-                    }}
-                }});
-            }} else {{
-                filteredData.forEach(r => {{
-                    if (r.tags && Array.isArray(r.tags)) {{
-                        r.tags.forEach(tag => groups.add(tag));
-                    }}
-                }});
-            }}
+            const categories = new Set();
+            filteredData.forEach(r => {{
+                if (r.category) {{
+                    categories.add(r.category);
+                }}
+            }});
             
             document.getElementById('totalCount').textContent = totalCount;
-            document.getElementById('categoryCount').textContent = groups.size;
+            document.getElementById('categoryCount').textContent = categories.size;
             document.getElementById('repoCount').textContent = repos;
         }}
 
@@ -497,25 +787,12 @@ def generate_dashboard_html(raw_data):
             const ctx = document.getElementById('distributionChart').getContext('2d');
             const filteredData = getFilteredData();
             
-            // Count by group
+            // Count by category
             const counts = {{}};
-            
-            if (currentGroupBy === 'category') {{
-                filteredData.forEach(r => {{
-                    const cat = r.category || 'Other';
-                    counts[cat] = (counts[cat] || 0) + 1;
-                }});
-            }} else {{
-                filteredData.forEach(r => {{
-                    if (r.tags && Array.isArray(r.tags) && r.tags.length > 0) {{
-                        r.tags.forEach(tag => {{
-                            counts[tag] = (counts[tag] || 0) + 1;
-                        }});
-                    }} else {{
-                        counts['No Tags'] = (counts['No Tags'] || 0) + 1;
-                    }}
-                }});
-            }}
+            filteredData.forEach(r => {{
+                const cat = r.category || 'Other';
+                counts[cat] = (counts[cat] || 0) + 1;
+            }});
             
             const labels = Object.keys(counts);
             const data = Object.values(counts);
@@ -524,8 +801,7 @@ def generate_dashboard_html(raw_data):
                 chart.destroy();
             }}
             
-            document.getElementById('chartTitle').textContent = 
-                currentGroupBy === 'category' ? 'Distribution by Category' : 'Distribution by Tags';
+            document.getElementById('chartTitle').textContent = 'Distribution by Category';
             
             chart = new Chart(ctx, {{
                 type: 'doughnut',
@@ -543,6 +819,13 @@ def generate_dashboard_html(raw_data):
                 options: {{
                     responsive: true,
                     maintainAspectRatio: false,
+                    onClick: (event, activeElements) => {{
+                        if (activeElements.length > 0) {{
+                            const index = activeElements[0].index;
+                            const category = labels[index];
+                            filterByCategory(category);
+                        }}
+                    }},
                     plugins: {{
                         legend: {{
                             position: 'bottom',
@@ -551,6 +834,17 @@ def generate_dashboard_html(raw_data):
                                 padding: 15,
                                 font: {{
                                     size: 12
+                                }}
+                            }}
+                        }},
+                        tooltip: {{
+                            callbacks: {{
+                                label: function(context) {{
+                                    const label = context.label || '';
+                                    const value = context.parsed || 0;
+                                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                    const percentage = ((value / total) * 100).toFixed(1);
+                                    return `${{label}}: ${{value}} (${{percentage}}%)`;
                                 }}
                             }}
                         }}
@@ -573,7 +867,8 @@ def generate_dashboard_html(raw_data):
                 return;
             }}
             
-            container.innerHTML = filteredData.map(result => {{
+            container.innerHTML = filteredData.map((result, index) => {{
+                const resultId = `result-${{index}}`;
                 const repoName = result.repo_url ? result.repo_url.split('/').slice(-2).join('/') : 'Unknown';
                 const prUrl = result.pr_id && result.repo_url ? 
                     `${{result.repo_url}}/pull/${{result.pr_id}}` : null;
@@ -607,14 +902,27 @@ def generate_dashboard_html(raw_data):
                 
                 if (result.tags && Array.isArray(result.tags) && result.tags.length > 0) {{
                     result.tags.forEach(tag => {{
-                        badges += `<span class="badge badge-tag">${{tag}}</span>`;
+                        badges += `<span class="badge badge-tag" onclick="event.stopPropagation(); filterByTag('${{tag}}')">${{tag}}</span>`;
                     }});
                 }}
                 
-                // Build files changed info
-                let filesInfo = '';
+                // Build files changed info for metadata section
+                let filesMetaInfo = '';
                 if (result.files_changed && result.files_changed.length > 0) {{
-                    filesInfo = `<div class="files-changed">Files changed: ${{result.files_changed.map(f => f.filename).join(', ')}}</div>`;
+                    const maxFilesToShow = 3;
+                    const filesToDisplay = result.files_changed.slice(0, maxFilesToShow);
+                    const remainingCount = result.files_changed.length - maxFilesToShow;
+                    
+                    filesMetaInfo = '<div class="files-list">';
+                    filesMetaInfo += '<div class="files-list-title">Files changed:</div>';
+                    filesToDisplay.forEach(f => {{
+                        const fileName = f.filename || f;
+                        filesMetaInfo += `<div class="file-item">${{fileName}}</div>`;
+                    }});
+                    if (remainingCount > 0) {{
+                        filesMetaInfo += `<div class="more-files">+${{remainingCount}} more...</div>`;
+                    }}
+                    filesMetaInfo += '</div>';
                 }}
                 
                 // Build error message if present (collapsible for long errors)
@@ -633,23 +941,104 @@ def generate_dashboard_html(raw_data):
                 }}
                 
                 return `
-                    <div class="result-card">
+                    <div class="result-card" data-index="${{index}}">
                         <div class="result-header">
-                            <a href="${{link}}" target="_blank" class="result-title">${{title}}</a>
+                            <div class="result-title-wrapper">
+                                <input type="checkbox" class="result-checkbox" id="${{resultId}}" onchange="toggleSelection(${{index}})" ${{selectedItems.has(index) ? 'checked' : ''}}>
+                                <a href="${{link}}" target="_blank" class="result-title">${{title}}</a>
+                            </div>
                         </div>
                         <div class="result-meta">
-                            <span class="result-meta-item">📦 ${{repoName}}</span>
-                            ${{prLink ? `<span class="result-meta-item">PR ${{prLink}}</span>` : ''}}
-                            ${{result.to_date ? `<span class="result-meta-item">📅 ${{new Date(result.to_date).toLocaleDateString()}}</span>` : ''}}
+                            <div class="result-meta-left">
+                                <span class="result-meta-item">📦 ${{repoName}}</span>
+                                ${{prLink ? `<span class="result-meta-item">PR ${{prLink}}</span>` : ''}}
+                                ${{result.to_date ? `<span class="result-meta-item">📅 ${{new Date(result.to_date).toLocaleDateString()}}</span>` : ''}}
+                            </div>
+                            ${{filesMetaInfo ? `<div class="result-meta-right">${{filesMetaInfo}}</div>` : ''}}
                         </div>
                         <div class="badges">${{badges}}</div>
-                        ${{filesInfo}}
                         ${{errorInfo}}
                     </div>
                 `;
             }}).join('');
             
-            document.getElementById('filterInfo').textContent = `Showing ${{rawData.length}} result(s)`;
+            document.getElementById('filterInfo').textContent = `Showing ${{filteredData.length}} result(s)`;
+            
+            // Add filter status
+            if (selectedTags.size > 0 || currentCategoryFilter) {{
+                let filterText = '';
+                if (selectedTags.size > 0) {{
+                    const tagsList = Array.from(selectedTags).join(', ');
+                    filterText = ` (filtered by tags: ${{tagsList}})`;
+                }} else if (currentCategoryFilter) {{
+                    filterText = ` (filtered by category: ${{currentCategoryFilter}})`;
+                }}
+                document.getElementById('filterInfo').textContent += filterText;
+            }}
+            
+            // Update download button state
+            updateDownloadButton();
+        }}
+
+        function toggleSelection(index) {{
+            if (selectedItems.has(index)) {{
+                selectedItems.delete(index);
+            }} else {{
+                selectedItems.add(index);
+            }}
+            updateDownloadButton();
+        }}
+
+        function updateDownloadButton() {{
+            const downloadBtn = document.getElementById('downloadBtn');
+            const btnText = document.getElementById('downloadBtnText');
+            const count = selectedItems.size;
+            
+            if (count > 0) {{
+                downloadBtn.disabled = false;
+                btnText.textContent = `Download Selected (${{count}})`;
+            }} else {{
+                downloadBtn.disabled = true;
+                btnText.textContent = 'Download Selected';
+            }}
+        }}
+
+        function downloadSelected() {{
+            if (selectedItems.size === 0) {{
+                alert('Please select at least one item to download.');
+                return;
+            }}
+
+            // Prompt for filename
+            const defaultFilename = `selected_results_${{new Date().toISOString().split('T')[0]}}.json`;
+            const filename = prompt('Enter filename for the download:', defaultFilename);
+            
+            if (!filename) {{
+                return; // User cancelled
+            }}
+
+            // Get filtered data and select only checked items
+            const filteredData = getFilteredData();
+            const selectedData = Array.from(selectedItems)
+                .map(index => filteredData[index])
+                .filter(item => item !== undefined);
+
+            // Create JSON blob
+            const jsonStr = JSON.stringify(selectedData, null, 2);
+            const blob = new Blob([jsonStr], {{ type: 'application/json' }});
+            
+            // Create download link
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename.endsWith('.json') ? filename : filename + '.json';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            // Show success message
+            alert(`Downloaded ${{selectedData.length}} item(s) to ${{a.download}}`);
         }}
 
         // Initialize on load
