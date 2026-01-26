@@ -260,6 +260,112 @@ class SimpleClassifier(BaseClassifier):
         
         patch = file_info.get("patch", "")
         return self.extract_version_change(patch)
+    
+    def check_gradle_wrapper_update(self, files: list) -> bool:
+        """
+        Check if the change updates the Gradle wrapper version.
+        
+        Returns True if gradle-wrapper.properties is modified.
+        """
+        for file_obj in files:
+            filename = file_obj.get("filename", "")
+            if "gradle-wrapper.properties" in filename:
+                return True
+        return False
+    
+    def check_configuration_cache_update(self, files: list) -> bool:
+        """
+        Check if buildscript changes appear to enable configuration cache.
+        
+        Looks for patterns like:
+        - org.gradle.configuration-cache
+        - org.gradle.unsafe.configuration-cache
+        - configurationCache
+        """
+        patterns = [
+            r'org\.gradle\.configuration-cache',
+            r'org\.gradle\.unsafe\.configuration-cache',
+            r'configurationCache',
+            r'configuration-cache'
+        ]
+        
+        for file_obj in files:
+            filename = file_obj.get("filename", "")
+            patch = file_obj.get("patch", "")
+            
+            # Check gradle property files and build scripts
+            if any(f in filename for f in ["gradle.properties", "build.gradle", "build.gradle.kts", "settings.gradle", "settings.gradle.kts"]):
+                for pattern in patterns:
+                    if re.search(pattern, patch):
+                        return True
+        return False
+    
+    def check_plugin_update(self, files: list) -> bool:
+        """
+        Check if the change updates a Gradle plugin version.
+        
+        Looks for changes to plugin declarations in build files.
+        """
+        for file_obj in files:
+            filename = file_obj.get("filename", "")
+            patch = file_obj.get("patch", "")
+            
+            # Check build scripts and version catalogs
+            if filename.endswith(("build.gradle", "build.gradle.kts", "libs.versions.toml")):
+                # Look for plugin-related patterns in the patch
+                plugin_patterns = [
+                    r'plugins\s*\{',  # plugins block
+                    r'id\s*["\']',    # plugin id
+                    r'id\(.*\)',      # plugin id() in Kotlin DSL
+                    r'apply\s+plugin',  # apply plugin
+                    r'\[plugins\]',   # [plugins] in toml
+                ]
+                
+                for pattern in plugin_patterns:
+                    if re.search(pattern, patch):
+                        # Check if there's a version change in the patch
+                        version_patterns = [
+                            r'version\s*[=:]?\s*["\']',
+                            r':\d+\.\d+',  # :1.2.3 format
+                        ]
+                        for ver_pattern in version_patterns:
+                            if re.search(ver_pattern, patch):
+                                return True
+        return False
+    
+    def check_warning_suppression(self, files: list) -> bool:
+        """
+        Check if the change includes warning suppression.
+        
+        Looks for patterns like:
+        - @SuppressWarnings
+        - @Suppress
+        - @SuppressLint
+        - //noinspection
+        - lint.disable
+        - nowarn
+        """
+        suppression_patterns = [
+            r'@SuppressWarnings',
+            r'@Suppress\b',
+            r'@SuppressLint',
+            r'//\s*noinspection',
+            r'lint\.disable',
+            r'nowarn',
+            r'@:nowarn',
+            r'-Xlint:-',
+        ]
+        
+        for file_obj in files:
+            patch = file_obj.get("patch", "")
+            
+            # Look for suppression patterns in added lines
+            for line in patch.split('\n'):
+                if line.startswith('+') and not line.startswith('+++'):
+                    for pattern in suppression_patterns:
+                        if re.search(pattern, line):
+                            return True
+        return False
 
     def classify(self, pair: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -275,12 +381,17 @@ class SimpleClassifier(BaseClassifier):
         
         Rules:
         1. If ONLY libs.versions.toml was changed -> Category = "Dependency Update"
-        2. If any dependency-related file was changed -> add "dependencies" tag
-        3. If exactly one line changed in a dependency file -> add "one-line" tag
-        4. If version increased -> add "version-update" tag and populate files_changed
-        5. Dependencies files include:
-           - libs.versions.toml
-           - changes within dependencies {} block in build.gradle or build.gradle.kts
+        2. If gradle wrapper properties changed (with optional minor other changes) -> Category = "Gradle Update"
+        3. If any dependency-related file was changed -> add "dependencies" tag
+        4. If exactly one line changed in a dependency file -> add "one-line" tag
+        5. If version increased -> add "version-update" tag and populate files_changed
+        6. If gradle wrapper properties changed -> add "wrapper-update" tag
+        7. If configuration cache changes detected -> add "configuration-cache-update" tag
+        8. If plugin version updated -> add "plugin-update" tag
+        9. If warning suppression detected -> add "warning-suppression" tag
+        10. Dependencies files include:
+            - libs.versions.toml
+            - changes within dependencies {} block in build.gradle or build.gradle.kts
         """
         to_commit = pair.get("to_commit") or pair.get("good_commit")  # Support both formats for backward compatibility
         
@@ -295,6 +406,7 @@ class SimpleClassifier(BaseClassifier):
         # Track what types of changes we found
         libs_versions_changed = False
         gradle_dependencies_changed = False
+        gradle_wrapper_changed = False
         other_files_changed = False
         
         # Check for single-line change
@@ -318,6 +430,27 @@ class SimpleClassifier(BaseClassifier):
                         "to_line_contents": version_change["to_line"]
                     }]
         
+        # Check for gradle wrapper update
+        if self.check_gradle_wrapper_update(files):
+            gradle_wrapper_changed = True
+            if "wrapper-update" not in tags:
+                tags.append("wrapper-update")
+        
+        # Check for configuration cache update
+        if self.check_configuration_cache_update(files):
+            if "configuration-cache-update" not in tags:
+                tags.append("configuration-cache-update")
+        
+        # Check for plugin update
+        if self.check_plugin_update(files):
+            if "plugin-update" not in tags:
+                tags.append("plugin-update")
+        
+        # Check for warning suppression
+        if self.check_warning_suppression(files):
+            if "warning-suppression" not in tags:
+                tags.append("warning-suppression")
+        
         for file_obj in files:
             filename = file_obj.get("filename", "")
             patch = file_obj.get("patch", "")
@@ -330,7 +463,8 @@ class SimpleClassifier(BaseClassifier):
                     gradle_dependencies_changed = True
                 else:
                     other_files_changed = True
-            else:
+            elif "gradle-wrapper.properties" not in filename:
+                # Don't count gradle wrapper as "other files" for Gradle Update category
                 other_files_changed = True
         
         # Apply classification rules
@@ -340,8 +474,12 @@ class SimpleClassifier(BaseClassifier):
             if "dependencies" not in tags:
                 tags.append("dependencies")
         
-        # Only set category to "Dependency Update" if ONLY libs.versions.toml changed
-        if libs_versions_changed and not gradle_dependencies_changed and not other_files_changed:
+        # Category assignment priority:
+        # 1. Gradle Update - if gradle wrapper changed (allows minor other changes)
+        # 2. Dependency Update - if ONLY libs.versions.toml changed
+        if gradle_wrapper_changed:
+            category = "Gradle Update"
+        elif libs_versions_changed and not gradle_dependencies_changed and not other_files_changed:
             category = "Dependency Update"
         
         # Update pair with classification results
