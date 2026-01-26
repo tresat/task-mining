@@ -1,0 +1,2 @@
+A change to the documentation of the project, including README files, inline code comments, or external documentation resources.
+Does not include changes to source code.

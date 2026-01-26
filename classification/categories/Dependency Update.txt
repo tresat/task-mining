@@ -1,0 +1,3 @@
+A change that is primarily a version update to a dependency or library used by the project.
+These changes must include updating the version number of a dependency in buildscript or version catalog files.
+They may also include MINOR changes to source code that are necessary to accommodate the updated dependency, such as changes to import statements or API usage, but if there are MAJOR changes to source code, those should be classified differently.

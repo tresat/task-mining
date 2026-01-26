@@ -1,3 +1,8 @@
 .env
 __pycache__/
 *.pyc
+.idea/
+inputs/
+results/
+.state/
+.cache/
