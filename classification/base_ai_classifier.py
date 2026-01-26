@@ -7,6 +7,9 @@ from classification.base_classifier import BaseClassifier
 # Cache directory for commit diffs
 COMMIT_DIFF_CACHE_DIR = os.path.join(".cache", "commit_contents")
 
+# Maximum characters to fetch from commit diff (to avoid excessive API response sizes)
+COMMIT_DIFF_MAX_LENGTH = 10000
+
 
 class BaseAIClassifier(BaseClassifier):
     """
@@ -93,7 +96,7 @@ class BaseAIClassifier(BaseClassifier):
         try:
             response = requests.get(url, headers=headers, timeout=15)
             if response.status_code == 200:
-                diff_content = response.text[:10000]  # Truncate
+                diff_content = response.text[:COMMIT_DIFF_MAX_LENGTH]  # Truncate
                 
                 # Save to cache
                 try:
