@@ -27,6 +27,7 @@ class BaseAIClassifier(BaseClassifier):
         super().__init__(github_token, repo_owner, repo_name)
         self.api_key = api_key
         self.categories = self._load_categories()
+        self.tags = self._load_tags()
         # Per-repo cache directory for commit diffs
         self.commit_diff_cache_dir = os.path.join(".cache", f"{self.owner}_{self.name}", "commit_contents")
     
@@ -62,6 +63,39 @@ class BaseAIClassifier(BaseClassifier):
             print(f"Warning: Error reading categories directory: {e}")
         
         return categories
+    
+    def _load_tags(self) -> Dict[str, str]:
+        """
+        Loads tag definitions from .txt files in classification/tags/.
+        
+        This is a concrete method shared by all AI classifiers.
+        """
+        tags = {}
+        tags_dir = os.path.join(os.path.dirname(__file__), "tags")
+        
+        if not os.path.exists(tags_dir):
+            print(f"Warning: Tags directory not found at {tags_dir}")
+            return tags
+        
+        try:
+            for filename in os.listdir(tags_dir):
+                if filename.endswith(".txt"):
+                    tag_name = filename[:-4]  # Remove .txt extension
+                    filepath = os.path.join(tags_dir, filename)
+                    try:
+                        with open(filepath, 'r') as f:
+                            description = f.read().strip()
+                            # Validate description: limit length
+                            if len(description) > 500:
+                                print(f"Warning: Description in {filename} exceeds 500 characters, truncating")
+                                description = description[:500]
+                            tags[tag_name] = description
+                    except Exception as e:
+                        print(f"Warning: Could not read tag file {filename}: {e}")
+        except Exception as e:
+            print(f"Warning: Error reading tags directory: {e}")
+        
+        return tags
     
     def get_commit_diff(self, commit_sha: str) -> str:
         """
@@ -130,7 +164,7 @@ class BaseAIClassifier(BaseClassifier):
             diff: Commit diff
             
         Returns:
-            dict with 'sub_category' and 'error' keys
+            dict with 'category', 'tags', and 'error' keys
         """
         pass
     

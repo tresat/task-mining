@@ -502,7 +502,7 @@ def generate_dashboard_html(raw_data):
             
             if (currentGroupBy === 'category') {{
                 filteredData.forEach(r => {{
-                    const cat = r.category || 'Uncategorized';
+                    const cat = r.category || 'Other';
                     counts[cat] = (counts[cat] || 0) + 1;
                 }});
             }} else {{
@@ -583,7 +583,22 @@ def generate_dashboard_html(raw_data):
                     `<a href="${{prUrl}}" target="_blank">#${{result.pr_id}}</a>` :
                     null;
                 
-                // Build badges
+                // Determine title: for PRs use first line of to_msg, for commits use to_msg
+                let title = 'No message';
+                if (result.to_msg) {{
+                    if (result.pr_id) {{
+                        // For PRs, extract first line before \\n\\n
+                        const firstLineMatch = result.to_msg.split('\\n\\n')[0];
+                        title = firstLineMatch || result.to_msg;
+                    }} else {{
+                        // For commits, use the full commit message
+                        title = result.to_msg;
+                    }}
+                }} else if (result.from_msg) {{
+                    title = result.from_msg;
+                }}
+                
+                const link = prUrl || commitUrl || '#';
                 let badges = '';
                 if (result.category) {{
                     const badgeClass = result.category === 'Unknown' ? 'badge-unknown' : 'badge-category';
@@ -616,9 +631,6 @@ def generate_dashboard_html(raw_data):
                         </div>
                     `;
                 }}
-                
-                const title = result.to_msg || result.from_msg || 'No message';
-                const link = prUrl || commitUrl || '#';
                 
                 return `
                     <div class="result-card">
