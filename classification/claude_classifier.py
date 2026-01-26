@@ -295,7 +295,6 @@ def main():
     
     classifier = ClaudeClassifier(gh_token, anthropic_key, owner, name)
     classifier.run(input_file, reclassify=args.reclassify)
-    classifier.run(input_file)
 
 if __name__ == "__main__":
     main()
