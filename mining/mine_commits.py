@@ -474,7 +474,7 @@ def process_repo(repo: str, token: str, search_limit: Optional[int], results_lim
     output_file = os.path.join(per_repo_dir, f"{owner}_{name}.json")
     state_file = os.path.join(state_dir, f"{owner}_{name}_commit_pairs_state.json")
     
-    miner = CommitMiner(token, owner, name, allow_missing_status)
+    miner = CommitMiner(token, owner, name, allow_missing_status=allow_missing_status)
     
     # Detect default branch if not specified
     if ref is None:

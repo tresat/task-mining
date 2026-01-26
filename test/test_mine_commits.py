@@ -89,7 +89,7 @@ class TestProcessRepo(unittest.TestCase):
             process_repo("owner/repo", "fake_token", 100, None, tmpdir, tmpdir, None, use_cache=True, allow_missing_status=False)
             
             # Verify miner was created with correct parameters (including allow_missing_status)
-            mock_miner_class.assert_called_once_with("fake_token", "owner", "repo", False)
+            mock_miner_class.assert_called_once_with("fake_token", "owner", "repo", allow_missing_status=False)
             
             # Verify get_default_branch was called
             mock_miner.get_default_branch.assert_called_once()
