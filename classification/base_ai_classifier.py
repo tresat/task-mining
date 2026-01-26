@@ -4,6 +4,9 @@ from abc import abstractmethod
 from typing import Dict, Any, Optional
 from classification.base_classifier import BaseClassifier
 
+# Cache directory for commit diffs
+COMMIT_DIFF_CACHE_DIR = os.path.join(".cache", "commit_contents")
+
 
 class BaseAIClassifier(BaseClassifier):
     """
@@ -68,8 +71,7 @@ class BaseAIClassifier(BaseClassifier):
         This is a concrete method shared by all AI classifiers.
         """
         # Define cache path
-        cache_dir = os.path.join(".cache", "commit_contents")
-        cache_file = os.path.join(cache_dir, f"{commit_sha}.txt")
+        cache_file = os.path.join(COMMIT_DIFF_CACHE_DIR, f"{commit_sha}.txt")
         
         # Check if diff exists in cache
         if os.path.exists(cache_file):
@@ -95,7 +97,7 @@ class BaseAIClassifier(BaseClassifier):
                 
                 # Save to cache
                 try:
-                    os.makedirs(cache_dir, exist_ok=True)
+                    os.makedirs(COMMIT_DIFF_CACHE_DIR, exist_ok=True)
                     with open(cache_file, 'w') as f:
                         f.write(diff_content)
                     print(f"Cached diff for {commit_sha}")

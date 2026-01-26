@@ -4,6 +4,7 @@ import sys
 import os
 import json
 import signal
+import shutil
 from contextlib import contextmanager
 from mining.mine_common import load_env
 
@@ -324,20 +325,18 @@ def main():
     
     # Clean cache if requested (done first, before anything else)
     if args.clean_cache:
-        import shutil
         from mining.cache import CacheManager
+        from classification.base_ai_classifier import COMMIT_DIFF_CACHE_DIR
         CacheManager.clear_all_caches()
         
         # Also clean commit diff cache
-        commit_cache_dir = os.path.join(".cache", "commit_contents")
-        if os.path.exists(commit_cache_dir):
-            print(f"Cleaning {commit_cache_dir}/ directory...")
-            shutil.rmtree(commit_cache_dir)
-            print(f"Removed {commit_cache_dir}/")
+        if os.path.exists(COMMIT_DIFF_CACHE_DIR):
+            print(f"Cleaning {COMMIT_DIFF_CACHE_DIR}/ directory...")
+            shutil.rmtree(COMMIT_DIFF_CACHE_DIR)
+            print(f"Removed {COMMIT_DIFF_CACHE_DIR}/")
     
     # Clean entire results and state directories if requested (done first, before processing any repos)
     if args.clean:
-        import shutil
         results_dir = "results"
         state_dir = ".state"
         
