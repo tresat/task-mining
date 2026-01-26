@@ -47,11 +47,22 @@ class BaseClassifier(ABC):
         if not any(filename.endswith(vf) for vf in valid_files):
             return None
         
-        # Check if only one line changed (1 addition, 1 deletion)
-        additions = file.get("additions", 0)
-        deletions = file.get("deletions", 0)
+        # Count actual changed lines by parsing the patch
+        patch = file.get("patch", "")
+        if not patch:
+            return None
         
-        if additions != 1 or deletions != 1:
+        # Count lines that start with + or - (excluding +++ and ---)
+        added_lines = 0
+        removed_lines = 0
+        for line in patch.split('\n'):
+            if line.startswith('+') and not line.startswith('+++'):
+                added_lines += 1
+            elif line.startswith('-') and not line.startswith('---'):
+                removed_lines += 1
+        
+        # Single line change means exactly 1 addition and 1 deletion
+        if added_lines != 1 or removed_lines != 1:
             return None
         
         return file

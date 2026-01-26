@@ -1,1 +1,2 @@
-Involves changes to project documentation files such as README, docs, or inline comments
+Involves changes to project documentation files such as README, markdown files (*.md), or standalone documentation directories (e.g., docs/).
+Does NOT include inline code comments, Javadoc, docstrings, JSDoc, or other code-level documentation.
