@@ -1,2 +1,3 @@
-A change to the documentation of the project, including README files, inline code comments, or external documentation resources.
-Does not include changes to source code.
+A change to the project documentation files such as README files, markdown documentation, or external documentation resources.
+Does NOT include inline code comments, Javadoc, docstrings, or other code-level documentation.
+Only includes changes to standalone documentation files (e.g., README.md, *.md, docs/, etc.).

@@ -7,6 +7,9 @@ import re
 from typing import List, Dict, Optional, Any
 from .mine_common import load_env, ensure_directory, process_repo_list
 
+# Configuration constants
+CURSOR_DISPLAY_LENGTH = 20      # Number of characters to show in cursor display
+
 # GraphQL Query to fetch commits (not PRs)
 COMMITS_QUERY = """
 query ($owner: String!, $name: String!, $ref: String!, $cursor: String, $limit: Int!) {
@@ -349,7 +352,9 @@ class CommitMiner:
                 "limit": batch_size
             }
             
-            print(f"Fetching commits from GitHub (cursor={cursor})...")
+            # Abbreviate cursor for display
+            cursor_display = f"{cursor[:CURSOR_DISPLAY_LENGTH]}" if cursor and len(cursor) > CURSOR_DISPLAY_LENGTH else cursor
+            print(f"Fetching commits from GitHub (cursor={cursor_display}, processed={processed_count})...")
             data = self._query(COMMITS_QUERY, variables)
             
             if not data.get("data") or not data["data"].get("repository"):

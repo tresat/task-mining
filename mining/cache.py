@@ -13,6 +13,7 @@ MAX_CACHE_ITEMS_PRS = 100      # Maximum number of PRs to cache per repository
 MAX_CACHE_ITEMS_COMMITS = 1000  # Maximum number of commits to cache per repository
 PR_BATCH_SIZE = 50             # Number of PRs to fetch per batch when priming
 COMMIT_BATCH_SIZE = 100        # Number of commits to fetch per batch when priming
+CURSOR_DISPLAY_LENGTH = 20     # Number of characters to show in cursor display
 
 
 class CacheManager:
@@ -174,7 +175,9 @@ def prime_pr_cache(miner, cache_manager: CacheManager, max_items: int = MAX_CACH
             "limit": batch_size
         }
         
-        print(f"Fetching PR list from GitHub (cursor={cursor})...")
+        # Abbreviate cursor for display and show progress
+        cursor_display = f"{cursor[:CURSOR_DISPLAY_LENGTH]}" if cursor and len(cursor) > CURSOR_DISPLAY_LENGTH else cursor
+        print(f"Fetching PR list from GitHub (fetched={items_fetched}, cursor={cursor_display})...")
         data = miner._query(PR_QUERY, variables)
         
         if not data.get("data") or not data["data"].get("repository"):
@@ -266,7 +269,9 @@ def prime_commit_cache(miner, cache_manager: CacheManager, ref: str, max_items: 
             "limit": batch_size
         }
         
-        print(f"Fetching commit list from GitHub (cursor={cursor})...")
+        # Abbreviate cursor for display and show progress
+        cursor_display = f"{cursor[:CURSOR_DISPLAY_LENGTH]}" if cursor and len(cursor) > CURSOR_DISPLAY_LENGTH else cursor
+        print(f"Fetching commit list from GitHub (fetched={items_fetched}, cursor={cursor_display})...")
         data = miner._query(COMMITS_QUERY, variables)
         
         if not data.get("data") or not data["data"].get("repository"):

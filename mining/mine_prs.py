@@ -6,6 +6,10 @@ import requests
 from typing import List, Dict, Optional, Generator, Any
 from .mine_common import load_env, ensure_directory, process_repo_list
 
+# Configuration constants
+CURSOR_DISPLAY_LENGTH = 20      # Number of characters to show in cursor display
+CACHE_SIZE_THRESHOLD = 100      # Don't fetch from GitHub if cache >= this size
+
 # GraphQL Queries
 PR_QUERY = """
 query ($owner: String!, $name: String!, $cursor: String, $limit: Int!) {
@@ -239,7 +243,8 @@ class PRMiner:
         
         # If using cache, try to mine from cache first
         if cache_manager:
-            print(f"\nMining from cache ({cache_manager.size()} PRs available)...")
+            cache_size = cache_manager.size()
+            print(f"\nMining from cache ({cache_size} PRs available)...")
             cached_prs = cache_manager.get_all()
             
             # Sort PR numbers to process in order
@@ -298,15 +303,28 @@ class PRMiner:
             with open(output_file, "w") as f:
                 json.dump(results, f, indent=2)
             new_from_cache = len(results) - initial_results_count
-            print(f"\nCache exhausted. Found {new_from_cache} new pairs from cache.")
+            
+            # Report cache processing results
+            if new_from_cache > 0:
+                print(f"\nProcessed {processed_count} PRs from cache. Found {new_from_cache} new pairs.")
+            else:
+                print(f"\nProcessed {processed_count} PRs from cache. No new valid pairs found.")
             
             # If we've hit limits, return
             if results_limit and len(results) >= results_limit:
+                print(f"Reached results limit of {results_limit} pairs.")
                 return results
             if search_limit and processed_count >= search_limit:
+                print(f"Reached search limit of {search_limit} PRs.")
                 return results
             
-            print(f"Fetching more PRs from GitHub...\n")
+            # Only fetch more from GitHub if cache was small (< CACHE_SIZE_THRESHOLD PRs)
+            # If we have a large cache but no results, the repo likely doesn't have many valid pairs
+            if cache_manager.size() < CACHE_SIZE_THRESHOLD:
+                print(f"Cache has fewer than {CACHE_SIZE_THRESHOLD} PRs. Fetching more from GitHub...\n")
+            else:
+                print(f"Cache has {cache_manager.size()} PRs. Stopping search (found {len(results)} pairs total).")
+                return results
         
         # Continue with GitHub API queries
         while True:
@@ -334,7 +352,9 @@ class PRMiner:
                 "limit": batch_size
             }
             
-            print(f"Fetching PRs from GitHub (cursor={cursor})...")
+            # Abbreviate cursor for display
+            cursor_display = f"{cursor[:CURSOR_DISPLAY_LENGTH]}" if cursor and len(cursor) > CURSOR_DISPLAY_LENGTH else cursor
+            print(f"Fetching PRs from GitHub (cursor={cursor_display}, processed={processed_count})...")
             data = self._query(PR_QUERY, variables)
             
             if not data.get("data") or not data["data"].get("repository"):
@@ -358,6 +378,9 @@ class PRMiner:
                     cache_manager.set(str(pr_number), pr_data)
                 total_cache_size = cache_manager.size()
                 print(f"Added {len(nodes)} PRs to cache (total: {total_cache_size})")
+            
+            # Track results count before processing this batch
+            batch_start_count = len(results)
             
             # Now process PRs FROM CACHE
             for pr in nodes:
@@ -416,9 +439,14 @@ class PRMiner:
             cursor = prs["pageInfo"]["endCursor"]
             self.save_state(state_file, cursor)
             
+            # Save to file (always)
             with open(output_file, "w") as f:
                 json.dump(results, f, indent=2)
-            print(f"Saved {len(results)} pairs (total) to {output_file}")
+            
+            # Only print save message if new pairs were added in this batch
+            batch_pairs_added = len(results) - batch_start_count
+            if batch_pairs_added > 0:
+                print(f"Saved {len(results)} pairs (total) to {output_file}")
             
             if not prs["pageInfo"]["hasNextPage"]:
                 print("Reached end of PRs.")
@@ -462,7 +490,12 @@ def process_repo(repo: str, token: str, search_limit: Optional[int], results_lim
         limit_desc.append(f"results limit: {results_limit} pairs")
     print(f"Mining {repo} ({', '.join(limit_desc) if limit_desc else 'no limits'})...")
     
-    miner.mine(search_limit, results_limit, output_file, state_file, cache_manager)
+    results = miner.mine(search_limit, results_limit, output_file, state_file, cache_manager)
+    
+    # Check if fewer results than requested were found
+    if results_limit and len(results) < results_limit:
+        print(f"⚠ Only found {len(results)} pair(s) for {repo} (requested {results_limit})")
+    
     print(f"Mining complete for {repo}.")
 
 def main():
