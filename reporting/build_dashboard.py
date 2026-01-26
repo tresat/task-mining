@@ -196,21 +196,85 @@ def generate_dashboard_html(raw_data):
 
         .stat-item {{
             text-align: center;
-            padding: 1rem;
-            border-radius: 0.75rem;
+            padding: 0.5rem;
+            border-radius: 0.5rem;
             background: rgba(255, 255, 255, 0.05);
         }}
 
         .stat-value {{
-            font-size: 2.5rem;
+            font-size: 1.5rem;
             font-weight: 700;
             color: var(--accent);
         }}
 
         .stat-label {{
-            font-size: 0.9rem;
+            font-size: 0.8rem;
             color: var(--text-secondary);
-            margin-top: 0.25rem;
+            margin-top: 0.1rem;
+        }}
+
+        .tags-section {{
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid var(--border);
+        }}
+
+        .tags-title {{
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 0.75rem;
+        }}
+
+        .tags-list {{
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }}
+
+        .tag-filter {{
+            padding: 0.4rem 0.8rem;
+            border-radius: 0.375rem;
+            font-size: 0.85rem;
+            font-weight: 600;
+            background-color: rgba(56, 189, 248, 0.2);
+            color: var(--accent);
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 1px solid transparent;
+        }}
+
+        .tag-filter:hover {{
+            background-color: rgba(56, 189, 248, 0.3);
+            border-color: var(--accent);
+        }}
+
+        .tag-filter.active {{
+            background-color: var(--accent);
+            color: var(--bg-color);
+        }}
+
+        .clear-filters {{
+            margin-top: 0.75rem;
+            padding: 0.4rem 0.8rem;
+            border-radius: 0.375rem;
+            font-size: 0.85rem;
+            font-weight: 600;
+            background-color: rgba(248, 113, 113, 0.2);
+            color: #f87171;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 1px solid transparent;
+            display: inline-block;
+        }}
+
+        .clear-filters:hover {{
+            background-color: rgba(248, 113, 113, 0.3);
+            border-color: #f87171;
+        }}
+
+        .clear-filters.hidden {{
+            display: none;
         }}
 
         .results-section {{
@@ -385,13 +449,6 @@ def generate_dashboard_html(raw_data):
                     <option value="ALL">ALL</option>
                 </select>
             </div>
-            <div class="control-group">
-                <label for="groupBy">Group By:</label>
-                <select id="groupBy" onchange="updateDisplay()">
-                    <option value="category">Category</option>
-                    <option value="tags">Tags</option>
-                </select>
-            </div>
         </div>
 
         <div class="dashboard-grid">
@@ -410,6 +467,11 @@ def generate_dashboard_html(raw_data):
                         <div class="stat-value" id="repoCount">0</div>
                         <div class="stat-label">Repositories</div>
                     </div>
+                </div>
+                <div class="tags-section">
+                    <div class="tags-title">Filter by Tags</div>
+                    <div class="tags-list" id="tagsList"></div>
+                    <div class="clear-filters hidden" id="clearFilters" onclick="clearFilters()">Clear Filters</div>
                 </div>
             </div>
 
@@ -434,8 +496,9 @@ def generate_dashboard_html(raw_data):
         const rawData = {raw_data_json};
 
         let chart = null;
-        let currentGroupBy = 'category';
         let currentRepoFilter = 'ALL';
+        let currentTagFilter = null;
+        let currentCategoryFilter = null;
 
         function initializeRepoFilter() {{
             const repos = new Set(rawData.map(r => r.repo_url));
@@ -454,18 +517,98 @@ def generate_dashboard_html(raw_data):
         }}
 
         function getFilteredData() {{
-            if (currentRepoFilter === 'ALL') {{
-                return rawData;
+            let filtered = rawData;
+            
+            // Filter by repository
+            if (currentRepoFilter !== 'ALL') {{
+                filtered = filtered.filter(r => r.repo_url === currentRepoFilter);
             }}
-            return rawData.filter(r => r.repo_url === currentRepoFilter);
+            
+            // Filter by tag
+            if (currentTagFilter) {{
+                filtered = filtered.filter(r => 
+                    r.tags && Array.isArray(r.tags) && r.tags.includes(currentTagFilter)
+                );
+            }}
+            
+            // Filter by category
+            if (currentCategoryFilter) {{
+                filtered = filtered.filter(r => 
+                    (r.category || 'Other') === currentCategoryFilter
+                );
+            }}
+            
+            return filtered;
         }}
 
         function updateDisplay() {{
-            currentGroupBy = document.getElementById('groupBy').value;
             currentRepoFilter = document.getElementById('repoFilter').value;
             updateStats();
+            updateTagsList();
             updateChart();
             displayResults();
+            updateClearFiltersButton();
+        }}
+
+        function clearFilters() {{
+            currentTagFilter = null;
+            currentCategoryFilter = null;
+            updateDisplay();
+        }}
+
+        function updateClearFiltersButton() {{
+            const clearBtn = document.getElementById('clearFilters');
+            if (currentTagFilter || currentCategoryFilter) {{
+                clearBtn.classList.remove('hidden');
+            }} else {{
+                clearBtn.classList.add('hidden');
+            }}
+        }}
+
+        function filterByTag(tag) {{
+            if (currentTagFilter === tag) {{
+                currentTagFilter = null;
+            }} else {{
+                currentTagFilter = tag;
+                currentCategoryFilter = null; // Clear category filter when tag is selected
+            }}
+            updateDisplay();
+        }}
+
+        function filterByCategory(category) {{
+            if (currentCategoryFilter === category) {{
+                currentCategoryFilter = null;
+            }} else {{
+                currentCategoryFilter = category;
+                currentTagFilter = null; // Clear tag filter when category is selected
+            }}
+            updateDisplay();
+        }}
+
+        function updateTagsList() {{
+            // Get all unique tags from current repository filter
+            const filteredByRepo = currentRepoFilter === 'ALL' ? rawData : 
+                rawData.filter(r => r.repo_url === currentRepoFilter);
+            
+            const tagsSet = new Set();
+            filteredByRepo.forEach(r => {{
+                if (r.tags && Array.isArray(r.tags)) {{
+                    r.tags.forEach(tag => tagsSet.add(tag));
+                }}
+            }});
+            
+            const tagsList = document.getElementById('tagsList');
+            const sortedTags = Array.from(tagsSet).sort();
+            
+            if (sortedTags.length === 0) {{
+                tagsList.innerHTML = '<span style="color: var(--text-secondary); font-size: 0.85rem;">No tags available</span>';
+                return;
+            }}
+            
+            tagsList.innerHTML = sortedTags.map(tag => {{
+                const activeClass = currentTagFilter === tag ? ' active' : '';
+                return `<span class="tag-filter${{activeClass}}" onclick="filterByTag('${{tag}}')">${{tag}}</span>`;
+            }}).join('');
         }}
 
         function updateStats() {{
@@ -473,23 +616,15 @@ def generate_dashboard_html(raw_data):
             const totalCount = filteredData.length;
             const repos = new Set(filteredData.map(r => r.repo_url)).size;
             
-            let groups = new Set();
-            if (currentGroupBy === 'category') {{
-                filteredData.forEach(r => {{
-                    if (r.category) {{
-                        groups.add(r.category);
-                    }}
-                }});
-            }} else {{
-                filteredData.forEach(r => {{
-                    if (r.tags && Array.isArray(r.tags)) {{
-                        r.tags.forEach(tag => groups.add(tag));
-                    }}
-                }});
-            }}
+            const categories = new Set();
+            filteredData.forEach(r => {{
+                if (r.category) {{
+                    categories.add(r.category);
+                }}
+            }});
             
             document.getElementById('totalCount').textContent = totalCount;
-            document.getElementById('categoryCount').textContent = groups.size;
+            document.getElementById('categoryCount').textContent = categories.size;
             document.getElementById('repoCount').textContent = repos;
         }}
 
@@ -497,25 +632,12 @@ def generate_dashboard_html(raw_data):
             const ctx = document.getElementById('distributionChart').getContext('2d');
             const filteredData = getFilteredData();
             
-            // Count by group
+            // Count by category
             const counts = {{}};
-            
-            if (currentGroupBy === 'category') {{
-                filteredData.forEach(r => {{
-                    const cat = r.category || 'Other';
-                    counts[cat] = (counts[cat] || 0) + 1;
-                }});
-            }} else {{
-                filteredData.forEach(r => {{
-                    if (r.tags && Array.isArray(r.tags) && r.tags.length > 0) {{
-                        r.tags.forEach(tag => {{
-                            counts[tag] = (counts[tag] || 0) + 1;
-                        }});
-                    }} else {{
-                        counts['No Tags'] = (counts['No Tags'] || 0) + 1;
-                    }}
-                }});
-            }}
+            filteredData.forEach(r => {{
+                const cat = r.category || 'Other';
+                counts[cat] = (counts[cat] || 0) + 1;
+            }});
             
             const labels = Object.keys(counts);
             const data = Object.values(counts);
@@ -524,8 +646,7 @@ def generate_dashboard_html(raw_data):
                 chart.destroy();
             }}
             
-            document.getElementById('chartTitle').textContent = 
-                currentGroupBy === 'category' ? 'Distribution by Category' : 'Distribution by Tags';
+            document.getElementById('chartTitle').textContent = 'Distribution by Category';
             
             chart = new Chart(ctx, {{
                 type: 'doughnut',
@@ -543,6 +664,13 @@ def generate_dashboard_html(raw_data):
                 options: {{
                     responsive: true,
                     maintainAspectRatio: false,
+                    onClick: (event, activeElements) => {{
+                        if (activeElements.length > 0) {{
+                            const index = activeElements[0].index;
+                            const category = labels[index];
+                            filterByCategory(category);
+                        }}
+                    }},
                     plugins: {{
                         legend: {{
                             position: 'bottom',
@@ -551,6 +679,17 @@ def generate_dashboard_html(raw_data):
                                 padding: 15,
                                 font: {{
                                     size: 12
+                                }}
+                            }}
+                        }},
+                        tooltip: {{
+                            callbacks: {{
+                                label: function(context) {{
+                                    const label = context.label || '';
+                                    const value = context.parsed || 0;
+                                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                    const percentage = ((value / total) * 100).toFixed(1);
+                                    return `${{label}}: ${{value}} (${{percentage}}%)`;
                                 }}
                             }}
                         }}
@@ -649,7 +788,18 @@ def generate_dashboard_html(raw_data):
                 `;
             }}).join('');
             
-            document.getElementById('filterInfo').textContent = `Showing ${{rawData.length}} result(s)`;
+            document.getElementById('filterInfo').textContent = `Showing ${{filteredData.length}} result(s)`;
+            
+            // Add filter status
+            if (currentTagFilter || currentCategoryFilter) {{
+                let filterText = '';
+                if (currentTagFilter) {{
+                    filterText = ` (filtered by tag: ${{currentTagFilter}})`;
+                }} else if (currentCategoryFilter) {{
+                    filterText = ` (filtered by category: ${{currentCategoryFilter}})`;
+                }}
+                document.getElementById('filterInfo').textContent += filterText;
+            }}
         }}
 
         // Initialize on load
