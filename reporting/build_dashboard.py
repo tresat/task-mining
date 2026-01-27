@@ -825,7 +825,7 @@ def generate_dashboard_html(raw_data):
         function updateChart() {{
             // Check if Chart.js is available
             if (typeof Chart === 'undefined') {{
-                console.warn('Chart.js not loaded, skipping chart update');
+                console.warn('Chart.js not loaded, chart visualization will not be available');
                 return;
             }}
             
@@ -952,9 +952,9 @@ def generate_dashboard_html(raw_data):
                 }}
                 
                 // Build files changed info for detailed section
+                const maxFilesToShow = 10;
                 let filesDetailInfo = '';
                 if (result.files_changed && result.files_changed.length > 0) {{
-                    const maxFilesToShow = 10;
                     const filesToDisplay = result.files_changed.slice(0, maxFilesToShow);
                     const remainingCount = result.files_changed.length - maxFilesToShow;
                     
@@ -972,6 +972,9 @@ def generate_dashboard_html(raw_data):
                 
                 // Extract summary
                 const summary = result.summary || '';
+                
+                // Determine if we should show the toggle button
+                const showToggleButton = summary && filesDetailInfo;
                 
                 // Build error message if present (collapsible for long errors)
                 let errorInfo = '';
@@ -1008,7 +1011,7 @@ def generate_dashboard_html(raw_data):
                         <div class="result-content">
                             ${{summary ? `<div class="result-summary">${{summary}}</div>` : ''}}
                             ${{filesDetailInfo ? `
-                                ${{summary ? `<button class="result-content-toggle" onclick="toggleFiles(${{index}})">
+                                ${{showToggleButton ? `<button class="result-content-toggle" onclick="toggleFiles(${{index}})">
                                     <span id="toggle-text-${{index}}">Show Files Changed</span>
                                 </button>` : ''}}
                                 <div class="result-files-section" id="files-${{index}}">
