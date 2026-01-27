@@ -1129,7 +1129,7 @@ def generate_dashboard_html(raw_data):
                     <div class="result-card" data-index="${{index}}">
                         <div class="result-header">
                             <div class="result-title-wrapper">
-                                <input type="checkbox" ${{result.to_verified ? 'checked' : ''}} disabled class="verified-checkbox" title="${{result.to_verified ? 'Verified build status' : 'Build status not verified'}}">
+                                <input type="checkbox" ${{result.to_verified ? 'checked' : ''}} disabled class="verified-checkbox" title="${{result.to_verified ? 'Verified build status' : 'Build status not verified'}}" aria-label="${{result.to_verified ? 'Verified build status' : 'Build status not verified'}}">
                                 <a href="${{link}}" target="_blank" class="result-title">${{title}}</a>
                             </div>
                             <input type="checkbox" class="result-checkbox" id="${{resultId}}" onchange="toggleSelection(${{index}})" ${{selectedItems.has(index) ? 'checked' : ''}}>
