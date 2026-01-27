@@ -842,6 +842,11 @@ def generate_dashboard_html(raw_data):
             }}
         }}
 
+        // Filter functions support multi-select behavior:
+        // - Tags and categories can be selected simultaneously
+        // - Multiple tags can be combined with AND or OR logic (controlled by checkbox)
+        // - Multiple categories are always combined with OR logic
+        // - All filters are applied together (repo + tags + categories + search)
         function filterByTag(tag) {{
             if (selectedTags.has(tag)) {{
                 selectedTags.delete(tag);
@@ -852,7 +857,7 @@ def generate_dashboard_html(raw_data):
         }}
 
         function filterByCategory(category) {{
-            // Toggle category selection
+            // Toggle category selection (multi-select with OR logic)
             if (activeCategories.has(category)) {{
                 activeCategories.delete(category);
             }} else {{
@@ -1096,9 +1101,6 @@ def generate_dashboard_html(raw_data):
                 
                 // Extract summary
                 const summary = result.summary || '';
-                
-                // Determine if we should show the toggle button
-                const showToggleButton = summary && filesDetailInfo;
                 
                 // Build error message if present (collapsible for long errors)
                 let errorInfo = '';
