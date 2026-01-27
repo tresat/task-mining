@@ -6,3 +6,5 @@ inputs/
 results/
 .state/
 .cache/
+# Root dashboard.html should not be committed (use results/dashboard.html instead)
+/dashboard.html
