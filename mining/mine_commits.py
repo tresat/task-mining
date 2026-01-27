@@ -300,15 +300,15 @@ class CommitMiner:
                 
                 # Create result entry - CommitMiner only checks for successful builds
                 result = {
-                    "pr_id": None,  # Not available for commit-based mining
                     "repo_url": f"https://github.com/{self.owner}/{self.name}",
+                    "pr_id": None,  # Not available for commit-based mining
                     "from_commit": parent_oid,
-                    "from_msg": "",  # Parent message not available without additional API call
                     "from_date": parent.get("committedDate", ""),
                     "to_commit": oid,
                     "to_msg": msg,
                     "to_date": commit["committedDate"],
                     "files_changed": [],  # Will be populated by classifier
+                    "summary": None,
                     "category": None,
                     "tags": [],
                     "error": None
@@ -420,15 +420,15 @@ class CommitMiner:
                 
                 # Create result entry - CommitMiner only checks for successful builds
                 result = {
-                    "pr_id": None,  # Not available for commit-based mining
                     "repo_url": f"https://github.com/{self.owner}/{self.name}",
+                    "pr_id": None,  # Not available for commit-based mining
                     "from_commit": parent_oid,
-                    "from_msg": "",  # Parent message not available without additional API call
                     "from_date": parent.get("committedDate", ""),
                     "to_commit": oid,
                     "to_msg": msg,
                     "to_date": commit["committedDate"],
                     "files_changed": [],  # Will be populated by classifier
+                    "summary": None,
                     "category": None,
                     "tags": [],
                     "error": None

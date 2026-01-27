@@ -278,15 +278,15 @@ class PRMiner:
                         if last_bad_commit:
                             bad_commit = last_bad_commit["commit"]
                             pair = {
-                                "pr_id": pr_number,
                                 "repo_url": f"https://github.com/{self.owner}/{self.name}",
+                                "pr_id": pr_number,
                                 "from_commit": bad_commit["oid"],
-                                "from_msg": bad_commit["message"].split('\n')[0],
                                 "from_date": bad_commit["committedDate"],
                                 "to_commit": oid,
                                 "to_msg": pr_description,
                                 "to_date": commit["committedDate"],
-                                "files_changed": [],  # Not available for PR-based mining; can be populated by classification
+                                "files_changed": [],  # Will be populated by classification
+                                "summary": None,
                                 "category": None,
                                 "tags": [],
                                 "error": None
@@ -408,15 +408,15 @@ class PRMiner:
                         if last_bad_commit:
                             bad_commit = last_bad_commit["commit"]
                             pair = {
-                                "pr_id": pr_number,
                                 "repo_url": f"https://github.com/{self.owner}/{self.name}",
+                                "pr_id": pr_number,
                                 "from_commit": bad_commit["oid"],
-                                "from_msg": bad_commit["message"].split('\n')[0],
                                 "from_date": bad_commit["committedDate"],
                                 "to_commit": oid,
                                 "to_msg": pr_description,
                                 "to_date": commit["committedDate"],
-                                "files_changed": [],  # Not available for PR-based mining; can be populated by classification
+                                "files_changed": [],  # Will be populated by classification
+                                "summary": None,
                                 "category": None,
                                 "tags": [],
                                 "error": None

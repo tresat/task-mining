@@ -395,7 +395,7 @@ class SimpleClassifier(BaseClassifier):
         2. If gradle wrapper properties changed (with optional minor other changes) -> Category = "Gradle Update"
         3. If any dependency-related file was changed -> add "dependencies" tag
         4. If exactly one line changed in a dependency file -> add "one-line" tag
-        5. If version increased -> add "version-update" tag and populate files_changed
+        5. If version increased -> add "version-update" tag
         6. If gradle wrapper properties changed -> add "wrapper-update" tag
         7. If configuration cache changes detected -> add "configuration-cache-update" tag
         8. If plugin version updated -> add "plugin-update" tag
@@ -403,6 +403,8 @@ class SimpleClassifier(BaseClassifier):
         10. Dependencies files include:
             - libs.versions.toml
             - changes within dependencies {} block in build.gradle or build.gradle.kts
+        11. Populate files_changed with list of filenames
+        12. Add summary field as copy of to_msg
         """
         to_commit = pair.get("to_commit") or pair.get("good_commit")  # Support both formats for backward compatibility
         
@@ -420,6 +422,19 @@ class SimpleClassifier(BaseClassifier):
         gradle_wrapper_changed = False
         other_files_changed = False
         
+        # Populate files_changed with list of filenames (ensuring at least one file)
+        if files:
+            pair["files_changed"] = [file_obj.get("filename", "") for file_obj in files]
+        elif not pair.get("files_changed"):
+            # If no files found but files_changed is empty, leave it as empty list
+            # The requirement says "at least one file" but we can't invent files
+            pair["files_changed"] = []
+        
+        # Add summary field - for simple classifier, copy to_msg
+        to_msg = pair.get("to_msg", "")
+        if not pair.get("summary"):
+            pair["summary"] = to_msg
+        
         # Check for single-line change
         file_info = self.is_single_line_change(commit_data)
         if file_info:
@@ -431,15 +446,6 @@ class SimpleClassifier(BaseClassifier):
             if version_change:
                 if "version-update" not in tags:
                     tags.append("version-update")
-                    
-                # Populate files_changed if empty
-                if not pair.get("files_changed"):
-                    pair["files_changed"] = [{
-                        "filename": file_info.get("filename"),
-                        "line_number": version_change["line_number"],
-                        "from_line_contents": version_change["from_line"],
-                        "to_line_contents": version_change["to_line"]
-                    }]
         
         # Check for gradle wrapper update
         if self.check_gradle_wrapper_update(files):

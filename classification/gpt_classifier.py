@@ -24,17 +24,17 @@ class GPTClassifier(BaseAIClassifier):
 
     
     def _call_ai_api(self, message: str, diff: str) -> dict:
-        """Asks GPT for categorization and tags using OpenAI API.
+        """Asks GPT for categorization, tags, and summary using OpenAI API.
         
         Returns:
-            dict with 'category', 'tags', and 'error' keys. 
+            dict with 'category', 'tags', 'summary', and 'error' keys. 
             If successful, error is None. If failed, category defaults to "Other" and error contains descriptive message.
         """
         if not diff:
-            return {"category": "Other", "tags": [], "error": "No diff available"}
+            return {"category": "Other", "tags": [], "summary": message, "error": "No diff available"}
         
         if not self.categories:
-            return {"category": "Other", "tags": [], "error": "No categories loaded"}
+            return {"category": "Other", "tags": [], "summary": message, "error": "No categories loaded"}
         
         # Build category descriptions dynamically
         category_descriptions = []
@@ -49,6 +49,7 @@ class GPTClassifier(BaseAIClassifier):
         prompt_text = f"""Analyze the following commit and provide:
 (1) ONE category from the list below
 (2) ALL applicable tags from the tag list below
+(3) A brief summary (maximum 3 sentences) of the changes
 
 Commit Message:
 {message}
@@ -64,16 +65,17 @@ TAGS (choose ALL that apply):
 
 Respond in this format:
 Category: [category name]
-Tags: [tag1, tag2, tag3] (or "none" if no tags apply)"""
+Tags: [tag1, tag2, tag3] (or "none" if no tags apply)
+Summary: [brief summary in 3 sentences or less]"""
         
         payload = {
             "model": "gpt-4o-mini",
             "messages": [
-                {"role": "system", "content": "You are a code classification assistant. Respond with the category and tags in the specified format."},
+                {"role": "system", "content": "You are a code classification assistant. Respond with the category, tags, and summary in the specified format."},
                 {"role": "user", "content": prompt_text}
             ],
             "temperature": 0.3,
-            "max_tokens": 100
+            "max_tokens": 200
         }
         
         try:
@@ -110,25 +112,42 @@ Tags: [tag1, tag2, tag3] (or "none" if no tags apply)"""
                                                 tags.append(tag_name)
                             break
                     
-                    return {"category": category, "tags": tags, "error": None}
+                    # Parse summary
+                    summary = message  # Default to message if summary not found
+                    summary_lines = []
+                    in_summary = False
+                    for line in answer.split('\n'):
+                        if line.lower().startswith('summary:'):
+                            summary_text = line.split(':', 1)[1].strip()
+                            if summary_text:
+                                summary_lines.append(summary_text)
+                            in_summary = True
+                        elif in_summary and line.strip():
+                            # Continue capturing summary lines
+                            summary_lines.append(line.strip())
+                    
+                    if summary_lines:
+                        summary = ' '.join(summary_lines)
+                    
+                    return {"category": category, "tags": tags, "summary": summary, "error": None}
                 except (KeyError, IndexError) as e:
                     error_msg = f"Error parsing GPT response: {e}"
                     print(error_msg)
-                    return {"category": "Other", "tags": [], "error": error_msg}
+                    return {"category": "Other", "tags": [], "summary": message, "error": error_msg}
             else:
                 error_msg = f"{response.status_code}: {response.text}"
                 print(f"OpenAI API Error {response.status_code}")
-                return {"category": "Other", "tags": [], "error": error_msg}
+                return {"category": "Other", "tags": [], "summary": message, "error": error_msg}
         except Exception as e:
             error_msg = f"Request error: {str(e)}"
             print(f"GPT Request Error: {e}")
-            return {"category": "Other", "tags": [], "error": error_msg}
+            return {"category": "Other", "tags": [], "summary": message, "error": error_msg}
     
     def classify(self, pair: Dict[str, Any]) -> Dict[str, Any]:
         """
         Main classification method for GPTClassifier.
         
-        Classifies using AI and handles tagging.
+        Classifies using AI and handles tagging and summary generation.
         """
         to_commit = pair.get("to_commit") or pair.get("good_commit")
         msg = pair.get("to_msg") or pair.get("good_msg")
@@ -136,14 +155,16 @@ Tags: [tag1, tag2, tag3] (or "none" if no tags apply)"""
         # Get commit diff
         diff = self.get_commit_diff(to_commit)
         
-        # Call AI API - this returns both category and tags in one call
+        # Call AI API - this returns category, tags, and summary in one call
         result = self._call_ai_api(msg, diff)
         category = result["category"]
         ai_tags = result["tags"]
+        summary = result["summary"]
         error = result["error"]
         
-        # Set category
+        # Set category and summary
         pair["category"] = category
+        pair["summary"] = summary
         
         # Initialize tags if not present
         if "tags" not in pair or pair["tags"] is None:
@@ -214,6 +235,7 @@ Tags: [tag1, tag2, tag3] (or "none" if no tags apply)"""
                 # Use cached result
                 pair["category"] = cached_result["category"]
                 pair["tags"] = cached_result["tags"]
+                pair["summary"] = cached_result.get("summary")  # May not exist in older cache
                 pair["error"] = cached_result["error"]
                 skipped_count += 1
             else:
@@ -227,12 +249,14 @@ Tags: [tag1, tag2, tag3] (or "none" if no tags apply)"""
                 result = self._call_ai_api(msg, diff)
                 category = result["category"]
                 ai_tags = result["tags"]
+                summary = result["summary"]
                 error = result["error"]
                 
                 print(f"  Assigned Category: {category}")
                 
-                # Set category
+                # Set category and summary
                 pair["category"] = category
+                pair["summary"] = summary
                 
                 # Initialize tags if not present
                 if "tags" not in pair or pair["tags"] is None:
@@ -260,7 +284,7 @@ Tags: [tag1, tag2, tag3] (or "none" if no tags apply)"""
                 classified_count += 1
                 
                 # Store result in cache
-                self.cache_manager.set_cached_result(item_id, pair["category"], pair["tags"], pair["error"])
+                self.cache_manager.set_cached_result(item_id, pair["category"], pair["tags"], pair.get("summary"), pair["error"])
                 
                 # Save incrementally every 5 items
                 if classified_count % 5 == 0:
