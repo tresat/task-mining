@@ -731,7 +731,7 @@ def generate_dashboard_html(raw_data):
         let currentSearchText = '';
 
         function initializeRepoFilter() {{
-            const repos = new Set(rawData.map(r => r.repo_url));
+            const repos = new Set(rawData.map(r => r.repo_url).filter(url => url));
             const repoFilter = document.getElementById('repoFilter');
             
             // Add ALL option (already in HTML)
