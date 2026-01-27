@@ -577,6 +577,73 @@ def generate_dashboard_html(raw_data):
             font-size: 1.5rem;
             margin-bottom: 0.5rem;
         }}
+
+        .tab-container {{
+            display: flex;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 1rem;
+            gap: 0.5rem;
+        }}
+
+        .tab-button {{
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            padding: 0.5rem 1rem;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 0.9rem;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+        }}
+
+        .tab-button:hover {{
+            color: var(--text-primary);
+        }}
+
+        .tab-button.active {{
+            color: var(--accent);
+            border-bottom-color: var(--accent);
+        }}
+
+        .tab-content {{
+            display: none;
+        }}
+
+        .tab-content.active {{
+            display: block;
+        }}
+
+        .file-changes-placeholder {{
+            color: var(--text-secondary);
+            font-style: italic;
+            padding: 0.5rem 0;
+        }}
+
+        .legend-item.selected {{
+            background-color: rgba(56, 189, 248, 0.1);
+            border: 2px solid var(--accent);
+        }}
+
+        .filter-mode-container {{
+            padding: 0.75rem 0;
+            margin-top: 0.5rem;
+            border-top: 1px solid var(--border);
+        }}
+
+        .filter-mode-container label {{
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            cursor: pointer;
+        }}
+
+        .filter-mode-container input[type="checkbox"] {{
+            cursor: pointer;
+            accent-color: var(--accent);
+        }}
     </style>
 </head>
 
@@ -620,6 +687,12 @@ def generate_dashboard_html(raw_data):
                 <div class="tags-section">
                     <div class="tags-title">Filter by Tags</div>
                     <div class="tags-list" id="tagsList"></div>
+                    <div class="filter-mode-container">
+                        <label>
+                            <input type="checkbox" id="filterMode" onchange="updateDisplay()">
+                            Use AND logic (intersection) for multiple tags
+                        </label>
+                    </div>
                     <div class="clear-filters hidden" id="clearFilters" onclick="clearFilters()">Clear Filters</div>
                 </div>
             </div>
@@ -653,7 +726,7 @@ def generate_dashboard_html(raw_data):
         let chart = null;
         let currentRepoFilter = 'ALL';
         let selectedTags = new Set();
-        let currentCategoryFilter = null;
+        let activeCategories = new Set();
         let selectedItems = new Set();
         let currentSearchText = '';
 
@@ -681,17 +754,27 @@ def generate_dashboard_html(raw_data):
                 filtered = filtered.filter(r => r.repo_url === currentRepoFilter);
             }}
             
-            // Filter by tag
+            // Filter by tag (with AND/OR logic support)
             if (selectedTags.size > 0) {{
-                filtered = filtered.filter(r => 
-                    r.tags && Array.isArray(r.tags) && r.tags.some(tag => selectedTags.has(tag))
-                );
+                const useIntersection = document.getElementById('filterMode')?.checked || false;
+                if (useIntersection) {{
+                    // AND logic: item must have ALL selected tags
+                    filtered = filtered.filter(r => {{
+                        if (!r.tags || !Array.isArray(r.tags)) return false;
+                        return Array.from(selectedTags).every(tag => r.tags.includes(tag));
+                    }});
+                }} else {{
+                    // OR logic: item must have at least one selected tag
+                    filtered = filtered.filter(r => 
+                        r.tags && Array.isArray(r.tags) && r.tags.some(tag => selectedTags.has(tag))
+                    );
+                }}
             }}
             
-            // Filter by category
-            if (currentCategoryFilter) {{
+            // Filter by category (multi-select support)
+            if (activeCategories.size > 0) {{
                 filtered = filtered.filter(r => 
-                    (r.category || 'Other') === currentCategoryFilter
+                    activeCategories.has(r.category || 'Other')
                 );
             }}
             
@@ -746,13 +829,13 @@ def generate_dashboard_html(raw_data):
 
         function clearFilters() {{
             selectedTags.clear();
-            currentCategoryFilter = null;
+            activeCategories.clear();
             updateDisplay();
         }}
 
         function updateClearFiltersButton() {{
             const clearBtn = document.getElementById('clearFilters');
-            if (selectedTags.size > 0 || currentCategoryFilter) {{
+            if (selectedTags.size > 0 || activeCategories.size > 0) {{
                 clearBtn.classList.remove('hidden');
             }} else {{
                 clearBtn.classList.add('hidden');
@@ -764,19 +847,60 @@ def generate_dashboard_html(raw_data):
                 selectedTags.delete(tag);
             }} else {{
                 selectedTags.add(tag);
-                currentCategoryFilter = null; // Clear category filter when tag is selected
             }}
             updateDisplay();
         }}
 
         function filterByCategory(category) {{
-            if (currentCategoryFilter === category) {{
-                currentCategoryFilter = null;
+            // Toggle category selection
+            if (activeCategories.has(category)) {{
+                activeCategories.delete(category);
             }} else {{
-                currentCategoryFilter = category;
-                selectedTags.clear(); // Clear tag filters when category is selected
+                activeCategories.add(category);
             }}
+            updateLegendHighlight();
             updateDisplay();
+        }}
+
+        function updateLegendHighlight() {{
+            // Update legend items to show selected state
+            const legendItems = document.querySelectorAll('.legend-item');
+            legendItems.forEach(item => {{
+                const labelElement = item.querySelector('.legend-label');
+                if (labelElement) {{
+                    const category = labelElement.textContent;
+                    if (activeCategories.has(category)) {{
+                        item.classList.add('selected');
+                    }} else {{
+                        item.classList.remove('selected');
+                    }}
+                }}
+            }});
+        }}
+
+        function switchTab(event, itemId, tabName) {{
+            // Prevent default behavior and stop propagation
+            event.preventDefault();
+            event.stopPropagation();
+            
+            // Get the result card element
+            const card = event.target.closest('.result-card');
+            if (!card) return;
+            
+            // Get all tab buttons and contents for this item
+            const tabButtons = card.querySelectorAll('.tab-button');
+            const tabContents = card.querySelectorAll('.tab-content');
+            
+            // Remove active class from all tabs
+            tabButtons.forEach(btn => btn.classList.remove('active'));
+            tabContents.forEach(content => content.classList.remove('active'));
+            
+            // Add active class to selected tab
+            event.currentTarget.classList.add('active');
+            const targetTab = document.getElementById(`${{itemId}}-${{tabName}}`);
+            if (targetTab) {{
+                targetTab.classList.add('active');
+            }}
         }}
 
         function updateTagsList() {{
@@ -1008,16 +1132,15 @@ def generate_dashboard_html(raw_data):
                         </div>
                         <div class="badges">${{badges}}</div>
                         ${{summary || filesDetailInfo ? `
-                        <div class="result-content">
-                            ${{summary ? `<div class="result-summary">${{summary}}</div>` : ''}}
-                            ${{filesDetailInfo ? `
-                                ${{showToggleButton ? `<button class="result-content-toggle" onclick="toggleFiles(${{index}})">
-                                    <span id="toggle-text-${{index}}">Show Files Changed</span>
-                                </button>` : ''}}
-                                <div class="result-files-section" id="files-${{index}}">
-                                    ${{filesDetailInfo}}
-                                </div>
-                            ` : ''}}
+                        <div class="tab-container">
+                            <button class="tab-button active" onclick="switchTab(event, '${{resultId}}', 'summary')">Summary</button>
+                            <button class="tab-button" onclick="switchTab(event, '${{resultId}}', 'files')">File Changes</button>
+                        </div>
+                        <div id="${{resultId}}-summary" class="tab-content active">
+                            ${{summary ? `<div class="result-summary">${{summary}}</div>` : '<div class="file-changes-placeholder">No summary available.</div>'}}
+                        </div>
+                        <div id="${{resultId}}-files" class="tab-content">
+                            ${{filesDetailInfo || '<div class="file-changes-placeholder">File change information is not available in the current dataset.</div>'}}
                         </div>
                         ` : ''}}
                         ${{errorInfo}}
@@ -1028,13 +1151,19 @@ def generate_dashboard_html(raw_data):
             document.getElementById('filterInfo').textContent = `Showing ${{filteredData.length}} result(s)`;
             
             // Add filter status
-            if (selectedTags.size > 0 || currentCategoryFilter) {{
+            if (selectedTags.size > 0 || activeCategories.size > 0) {{
                 let filterText = '';
                 if (selectedTags.size > 0) {{
                     const tagsList = Array.from(selectedTags).join(', ');
                     filterText = ` (filtered by tags: ${{tagsList}})`;
-                }} else if (currentCategoryFilter) {{
-                    filterText = ` (filtered by category: ${{currentCategoryFilter}})`;
+                }}
+                if (activeCategories.size > 0) {{
+                    const categoriesList = Array.from(activeCategories).join(', ');
+                    if (filterText) {{
+                        filterText += ` and categories: ${{categoriesList}}`;
+                    }} else {{
+                        filterText = ` (filtered by categories: ${{categoriesList}})`;
+                    }}
                 }}
                 document.getElementById('filterInfo').textContent += filterText;
             }}
@@ -1063,19 +1192,6 @@ def generate_dashboard_html(raw_data):
             }} else {{
                 downloadBtn.disabled = true;
                 btnText.textContent = 'Download Selected';
-            }}
-        }}
-
-        function toggleFiles(index) {{
-            const filesSection = document.getElementById(`files-${{index}}`);
-            const toggleText = document.getElementById(`toggle-text-${{index}}`);
-            
-            if (filesSection.classList.contains('show')) {{
-                filesSection.classList.remove('show');
-                toggleText.textContent = 'Show Files Changed';
-            }} else {{
-                filesSection.classList.add('show');
-                toggleText.textContent = 'Hide Files Changed';
             }}
         }}
 
