@@ -422,12 +422,15 @@ class SimpleClassifier(BaseClassifier):
         gradle_wrapper_changed = False
         other_files_changed = False
         
-        # Populate files_changed with list of filenames (ensuring at least one file)
+        # Populate files_changed with list of filenames (filtering out empty/None)
         if files:
-            pair["files_changed"] = [file_obj.get("filename", "") for file_obj in files]
+            pair["files_changed"] = [
+                file_obj.get("filename", "") 
+                for file_obj in files 
+                if file_obj.get("filename")
+            ]
         elif not pair.get("files_changed"):
             # If no files found but files_changed is empty, leave it as empty list
-            # The requirement says "at least one file" but we can't invent files
             pair["files_changed"] = []
         
         # Add summary field - for simple classifier, copy to_msg
