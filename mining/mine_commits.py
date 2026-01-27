@@ -69,10 +69,11 @@ query ($owner: String!, $name: String!, $oid: String!) {
 """
 
 class CommitMiner:
-    def __init__(self, token: str, repo_owner: str, repo_name: str):
+    def __init__(self, token: str, repo_owner: str, repo_name: str, allow_missing_status: bool = False):
         self.token = token
         self.owner = repo_owner
         self.name = repo_name
+        self.allow_missing_status = allow_missing_status
         self.headers = {"Authorization": f"Bearer {token}"}
         self.graphql_url = "https://api.github.com/graphql"
         self.rest_api_url = "https://api.github.com"
@@ -169,6 +170,10 @@ class CommitMiner:
         """
         Determines if a commit build was successful.
         Checks both statusCheckRollup (Check Runs) and legacy status.
+        
+        If allow_missing_status is enabled, commits without status info are
+        treated as potentially valid. This is useful for repositories without
+        CI/CD configured or that don't use GitHub status checks.
         """
         # Priority 1: StatusCheckRollup (Modern Check Runs + Statuses)
         rollup = commit_data.get("statusCheckRollup")
@@ -182,8 +187,13 @@ class CommitMiner:
             state = status.get("state")
             return state == "SUCCESS"
             
-        # If no status info, assume it's NOT a success (we only want proven successes)
-        return False
+        # If no status info exists
+        if self.allow_missing_status:
+            # When allow_missing_status is enabled, treat commits without status as valid
+            return True
+        else:
+            # By default, assume it's NOT a success (we only want proven successes)
+            return False
 
     def get_commit_diff(self, commit_sha: str) -> Optional[Dict[str, Any]]:
         """Fetches the diff for a commit using REST API."""
@@ -444,7 +454,7 @@ class CommitMiner:
                 
         return results
 
-def process_repo(repo: str, token: str, search_limit: Optional[int], results_limit: Optional[int], output_dir: str, state_dir: str, ref: Optional[str] = None, use_cache: bool = True):
+def process_repo(repo: str, token: str, search_limit: Optional[int], results_limit: Optional[int], output_dir: str, state_dir: str, ref: Optional[str] = None, use_cache: bool = True, allow_missing_status: bool = False):
     """Process a single repository with optional caching."""
     # Note: PROCESSING REPO message is printed by run_pipeline.py, not here
     
@@ -464,7 +474,7 @@ def process_repo(repo: str, token: str, search_limit: Optional[int], results_lim
     output_file = os.path.join(per_repo_dir, f"{owner}_{name}.json")
     state_file = os.path.join(state_dir, f"{owner}_{name}_commit_pairs_state.json")
     
-    miner = CommitMiner(token, owner, name)
+    miner = CommitMiner(token, owner, name, allow_missing_status=allow_missing_status)
     
     # Detect default branch if not specified
     if ref is None:
@@ -484,6 +494,9 @@ def process_repo(repo: str, token: str, search_limit: Optional[int], results_lim
         limit_desc.append(f"results limit: {results_limit} pairs")
     print(f"Mining {repo} ({', '.join(limit_desc) if limit_desc else 'no limits'})...")
     
+    if allow_missing_status:
+        print("Note: Allowing commits without status checks (--allow-missing-status enabled)")
+    
     miner.mine(search_limit, results_limit, output_file, state_file, ref, cache_manager)
     print(f"Mining complete for {repo}.")
 
@@ -498,6 +511,9 @@ def main():
     parser.add_argument("--output", default="results", help="Output directory for results")
     parser.add_argument("--state", default=".state", help="Directory for state files (default: .state)")
     parser.add_argument("--ref", default=None, help="Git ref to scan (e.g., refs/heads/main). If not specified, auto-detects main or master")
+    parser.add_argument("--allow-missing-status", action="store_true", 
+                       help="Allow commits without status checks. Useful for repositories without CI/CD configured. "
+                            "Without this flag, only commits with verified successful builds are included.")
     
     args = parser.parse_args()
     
@@ -514,7 +530,7 @@ def main():
     
     for repo in repos:
         try:
-            process_repo(repo, token, args.search_limit, args.results_limit, args.output, args.state, args.ref)
+            process_repo(repo, token, args.search_limit, args.results_limit, args.output, args.state, args.ref, use_cache=True, allow_missing_status=args.allow_missing_status)
         except Exception as e:
             print(f"Failed to process {repo}: {e}")
             # Continue to next repo

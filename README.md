@@ -53,6 +53,7 @@ python3 run_pipeline.py repos.txt --search-limit 100
 - `--clean` - Delete results/ and .state/ directories before running
 - `--clean-cache` - Delete .cache/ directory before running
 - `--timeout N` - Timeout in seconds per repository (default: 120)
+- `--allow-missing-status` - Allow commits without status checks (for `--type commits` only). Useful for repositories without CI/CD configured. Without this flag, only commits with verified successful builds are included.
 
 ### Examples
 
@@ -77,6 +78,9 @@ python3 run_pipeline.py android/nowinandroid --search-limit 100 --clean
 
 # Mine commits instead of PRs
 python3 run_pipeline.py android/nowinandroid --results-limit 100 --type commits
+
+# Mine commits from repo WITHOUT CI/CD (allow missing status checks)
+python3 run_pipeline.py gradle/gradle-profiler --results-limit 100 --type commits --allow-missing-status
 
 # Multiple repositories with longer timeout
 python3 run_pipeline.py repos.txt --search-limit 100 --timeout 300
@@ -159,6 +163,21 @@ The pipeline automatically caches GitHub API responses in `.cache/` to improve p
 ## Resumability
 
 Mining operations save state in `.state/` directory and can be resumed if interrupted. Just run the same command again to continue.
+
+## Repositories Without CI/CD
+
+If you're mining commits from a repository that doesn't have CI/CD configured or doesn't use GitHub status checks, the tool will return 0 results by default. This is because the commit miner requires verified successful builds to ensure data quality.
+
+**Solution**: Use the `--allow-missing-status` flag with `--type commits`:
+
+```bash
+python3 run_pipeline.py gradle/gradle-profiler --results-limit 100 --type commits --allow-missing-status
+```
+
+**Trade-off**: When this flag is enabled, commits without status checks are treated as potentially valid. This allows mining from repositories without CI/CD, but the resulting pairs may not represent actual build failures and fixes. Use this option when:
+- The repository doesn't have CI/CD configured
+- You want to mine commit pairs based on structure rather than verified build status
+- You're willing to accept lower confidence in the "bad→good" relationship
 
 ## Project Structure
 
