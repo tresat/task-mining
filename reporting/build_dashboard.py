@@ -365,12 +365,11 @@ def generate_dashboard_html(raw_data):
         }}
 
         .result-checkbox {{
-            position: relative;
-            top: 0.25rem;
             width: 1.2rem;
             height: 1.2rem;
             cursor: pointer;
             accent-color: var(--accent);
+            flex-shrink: 0;
         }}
 
         .result-title-wrapper {{
@@ -519,6 +518,46 @@ def generate_dashboard_html(raw_data):
             font-family: 'Courier New', monospace;
             font-size: 0.85rem;
             color: #f87171;
+        }}
+
+        .result-content {{
+            margin-top: 0.75rem;
+        }}
+
+        .result-summary {{
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            line-height: 1.6;
+            margin-bottom: 0.75rem;
+        }}
+
+        .result-content-toggle {{
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: rgba(56, 189, 248, 0.1);
+            border: 1px solid rgba(56, 189, 248, 0.2);
+            color: var(--accent);
+            padding: 0.4rem 0.75rem;
+            border-radius: 0.375rem;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-bottom: 0.75rem;
+        }}
+
+        .result-content-toggle:hover {{
+            background: rgba(56, 189, 248, 0.2);
+            border-color: rgba(56, 189, 248, 0.4);
+        }}
+
+        .result-files-section {{
+            display: none;
+        }}
+
+        .result-files-section.show {{
+            display: block;
             white-space: pre-wrap;
             word-wrap: break-word;
             overflow-x: auto;
@@ -784,6 +823,12 @@ def generate_dashboard_html(raw_data):
         }}
 
         function updateChart() {{
+            // Check if Chart.js is available
+            if (typeof Chart === 'undefined') {{
+                console.warn('Chart.js not loaded, chart visualization will not be available');
+                return;
+            }}
+            
             const ctx = document.getElementById('distributionChart').getContext('2d');
             const filteredData = getFilteredData();
             
@@ -906,24 +951,30 @@ def generate_dashboard_html(raw_data):
                     }});
                 }}
                 
-                // Build files changed info for metadata section
-                let filesMetaInfo = '';
+                // Build files changed info for detailed section
+                const maxFilesToShow = 10;
+                let filesDetailInfo = '';
                 if (result.files_changed && result.files_changed.length > 0) {{
-                    const maxFilesToShow = 3;
                     const filesToDisplay = result.files_changed.slice(0, maxFilesToShow);
                     const remainingCount = result.files_changed.length - maxFilesToShow;
                     
-                    filesMetaInfo = '<div class="files-list">';
-                    filesMetaInfo += '<div class="files-list-title">Files changed:</div>';
+                    filesDetailInfo = '<div class="files-list">';
+                    filesDetailInfo += '<div class="files-list-title">Files changed:</div>';
                     filesToDisplay.forEach(f => {{
                         const fileName = f.filename || f;
-                        filesMetaInfo += `<div class="file-item">${{fileName}}</div>`;
+                        filesDetailInfo += `<div class="file-item">${{fileName}}</div>`;
                     }});
                     if (remainingCount > 0) {{
-                        filesMetaInfo += `<div class="more-files">+${{remainingCount}} more...</div>`;
+                        filesDetailInfo += `<div class="more-files">+${{remainingCount}} more...</div>`;
                     }}
-                    filesMetaInfo += '</div>';
+                    filesDetailInfo += '</div>';
                 }}
+                
+                // Extract summary
+                const summary = result.summary || '';
+                
+                // Determine if we should show the toggle button
+                const showToggleButton = summary && filesDetailInfo;
                 
                 // Build error message if present (collapsible for long errors)
                 let errorInfo = '';
@@ -944,9 +995,9 @@ def generate_dashboard_html(raw_data):
                     <div class="result-card" data-index="${{index}}">
                         <div class="result-header">
                             <div class="result-title-wrapper">
-                                <input type="checkbox" class="result-checkbox" id="${{resultId}}" onchange="toggleSelection(${{index}})" ${{selectedItems.has(index) ? 'checked' : ''}}>
                                 <a href="${{link}}" target="_blank" class="result-title">${{title}}</a>
                             </div>
+                            <input type="checkbox" class="result-checkbox" id="${{resultId}}" onchange="toggleSelection(${{index}})" ${{selectedItems.has(index) ? 'checked' : ''}}>
                         </div>
                         <div class="result-meta">
                             <div class="result-meta-left">
@@ -954,9 +1005,21 @@ def generate_dashboard_html(raw_data):
                                 ${{prLink ? `<span class="result-meta-item">PR ${{prLink}}</span>` : ''}}
                                 ${{result.to_date ? `<span class="result-meta-item">📅 ${{new Date(result.to_date).toLocaleDateString()}}</span>` : ''}}
                             </div>
-                            ${{filesMetaInfo ? `<div class="result-meta-right">${{filesMetaInfo}}</div>` : ''}}
                         </div>
                         <div class="badges">${{badges}}</div>
+                        ${{summary || filesDetailInfo ? `
+                        <div class="result-content">
+                            ${{summary ? `<div class="result-summary">${{summary}}</div>` : ''}}
+                            ${{filesDetailInfo ? `
+                                ${{showToggleButton ? `<button class="result-content-toggle" onclick="toggleFiles(${{index}})">
+                                    <span id="toggle-text-${{index}}">Show Files Changed</span>
+                                </button>` : ''}}
+                                <div class="result-files-section" id="files-${{index}}">
+                                    ${{filesDetailInfo}}
+                                </div>
+                            ` : ''}}
+                        </div>
+                        ` : ''}}
                         ${{errorInfo}}
                     </div>
                 `;
@@ -1000,6 +1063,19 @@ def generate_dashboard_html(raw_data):
             }} else {{
                 downloadBtn.disabled = true;
                 btnText.textContent = 'Download Selected';
+            }}
+        }}
+
+        function toggleFiles(index) {{
+            const filesSection = document.getElementById(`files-${{index}}`);
+            const toggleText = document.getElementById(`toggle-text-${{index}}`);
+            
+            if (filesSection.classList.contains('show')) {{
+                filesSection.classList.remove('show');
+                toggleText.textContent = 'Show Files Changed';
+            }} else {{
+                filesSection.classList.add('show');
+                toggleText.textContent = 'Hide Files Changed';
             }}
         }}
 
