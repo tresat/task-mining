@@ -1,1 +1,3 @@
-Adding new functionality
+A change that adds new functionality.
+MOST major changes to non-buildscript project source code should be classified here.
+This should take priority over Build Configuration and Dependency Management - when there are MAJOR non-buildscript project source code changes that add functionality, this category should be used.

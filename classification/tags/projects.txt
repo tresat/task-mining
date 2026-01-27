@@ -1,0 +1,1 @@
+Adds or removes Gradle projects (which should require a change to settings.gradle or settings.gradle.kts).

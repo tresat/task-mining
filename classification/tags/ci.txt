@@ -1,0 +1,1 @@
+Changes to CI setup, for instance GitHub Actions, Travis CI, CircleCI, etc. or other files in the .github or similar directories.

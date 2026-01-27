@@ -1,0 +1,5 @@
+A change that primarily affects dependency configuration in a Gradle build script or version catalog.
+Other MINOR changes to a build script that are necessary to accommodate the dependency changes are acceptable, but should not be the main focus.
+These changes should result in different libraries or SDKs being used by the project.
+These changes usually include updating the version number of a dependency in buildscript or version catalog files.
+They may also include MINOR changes to source code that are necessary to accommodate the updated dependency, such as changes to import statements or API usage, but if there are MAJOR changes to source code, those should be classified differently.
