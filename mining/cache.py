@@ -2,7 +2,7 @@
 GitHub API Caching System
 
 This module provides a comprehensive caching system for GitHub API responses.
-Cache structure: .cache/{owner}_{name}/ with prs_cache.json and commits_cache.json
+Cache structure: .cache/repos/{owner}_{name}/ with prs_cache.json and commits_cache.json
 """
 import os
 import json
@@ -32,8 +32,8 @@ class CacheManager:
         self.name = name
         self.cache_type = cache_type
         
-        # Cache directory structure: .cache/{owner}_{name}/
-        self.cache_dir = os.path.join(".cache", f"{owner}_{name}")
+        # Cache directory structure: .cache/repos/{owner}_{name}/
+        self.cache_dir = os.path.join(".cache", "repos", f"{owner}_{name}")
         
         # Cache file based on type
         if cache_type == "prs":

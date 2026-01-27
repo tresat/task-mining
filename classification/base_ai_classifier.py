@@ -29,7 +29,7 @@ class BaseAIClassifier(BaseClassifier):
         self.categories = self._load_categories()
         self.tags = self._load_tags()
         # Per-repo cache directory for commit diffs
-        self.commit_diff_cache_dir = os.path.join(".cache", f"{self.owner}_{self.name}", "commit_contents")
+        self.commit_diff_cache_dir = os.path.join(".cache", "repos", f"{self.owner}_{self.name}", "commit_contents")
     
     def _load_categories(self) -> Dict[str, str]:
         """
@@ -102,7 +102,7 @@ class BaseAIClassifier(BaseClassifier):
         Fetches the diff of a commit from GitHub.
         
         This method uses caching to avoid redundant API calls.
-        Cache location: .cache/{owner}_{name}/commit_contents/{commit_sha}.txt
+        Cache location: .cache/repos/{owner}_{name}/commit_contents/{commit_sha}.txt
         
         This is a concrete method shared by all AI classifiers.
         """
