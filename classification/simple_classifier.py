@@ -425,9 +425,9 @@ class SimpleClassifier(BaseClassifier):
         # Populate files_changed with list of filenames (filtering out empty/None)
         if files:
             pair["files_changed"] = [
-                file_obj.get("filename", "") 
+                filename
                 for file_obj in files 
-                if file_obj.get("filename")
+                if (filename := file_obj.get("filename")) and filename.strip()
             ]
         elif not pair.get("files_changed"):
             # If no files found but files_changed is empty, leave it as empty list
