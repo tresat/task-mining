@@ -139,6 +139,30 @@ class PRMiner:
             
         # If no status info, assume it's NOT a success (we only want proven successes)
         return False
+    
+    def is_build_successful_with_verification(self, commit_node: Dict[str, Any]) -> tuple:
+        """
+        Determines if a commit build was successful and whether it was verified.
+        
+        Returns:
+            tuple: (is_successful: bool, is_verified: bool)
+        """
+        commit = commit_node.get("commit", {})
+        
+        # Priority 1: StatusCheckRollup (Modern Check Runs + Statuses)
+        rollup = commit.get("statusCheckRollup")
+        if rollup:
+            state = rollup.get("state")
+            return (state == "SUCCESS", True)
+            
+        # Priority 2: Legacy Status
+        status = commit.get("status")
+        if status:
+            state = status.get("state")
+            return (state == "SUCCESS", True)
+            
+        # If no status info, not verified
+        return (False, False)
 
     def is_build_failed(self, commit_node: Dict[str, Any]) -> bool:
         """
@@ -157,6 +181,27 @@ class PRMiner:
             return state in ["FAILURE", "ERROR"]
             
         return False
+    
+    def is_build_failed_with_verification(self, commit_node: Dict[str, Any]) -> tuple:
+        """
+        Determines if a commit build failed and whether it was verified.
+        
+        Returns:
+            tuple: (is_failed: bool, is_verified: bool)
+        """
+        commit = commit_node.get("commit", {})
+        
+        rollup = commit.get("statusCheckRollup")
+        if rollup:
+            state = rollup.get("state")
+            return (state in ["FAILURE", "ERROR"], True)
+            
+        status = commit.get("status")
+        if status:
+            state = status.get("state")
+            return (state in ["FAILURE", "ERROR"], True)
+            
+        return (False, False)
     
     def _build_pr_description(self, pr_data: Dict[str, Any]) -> str:
         """Builds a PR description from title and body."""
@@ -272,21 +317,27 @@ class PRMiner:
                     oid = commit["oid"]
                     msg = commit["message"].split('\n')[0]
                     
-                    if self.is_build_failed(commit_node):
-                        last_bad_commit = commit_node
-                    elif self.is_build_successful(commit_node):
+                    is_failed, from_verified = self.is_build_failed_with_verification(commit_node)
+                    is_successful, to_verified = self.is_build_successful_with_verification(commit_node)
+                    
+                    if is_failed:
+                        last_bad_commit = (commit_node, from_verified)
+                    elif is_successful:
                         if last_bad_commit:
-                            bad_commit = last_bad_commit["commit"]
+                            bad_commit_node, bad_verified = last_bad_commit
+                            bad_commit = bad_commit_node["commit"]
                             pair = {
-                                "pr_id": pr_number,
                                 "repo_url": f"https://github.com/{self.owner}/{self.name}",
+                                "pr_id": pr_number,
                                 "from_commit": bad_commit["oid"],
-                                "from_msg": bad_commit["message"].split('\n')[0],
                                 "from_date": bad_commit["committedDate"],
+                                "from_verified": bad_verified,
                                 "to_commit": oid,
                                 "to_msg": pr_description,
                                 "to_date": commit["committedDate"],
-                                "files_changed": [],  # Not available for PR-based mining; can be populated by classification
+                                "to_verified": to_verified,
+                                "files_changed": [],  # Will be populated by classification
+                                "summary": None,
                                 "category": None,
                                 "tags": [],
                                 "error": None
@@ -402,21 +453,27 @@ class PRMiner:
                     oid = commit["oid"]
                     msg = commit["message"].split('\n')[0]
                     
-                    if self.is_build_failed(commit_node):
-                        last_bad_commit = commit_node
-                    elif self.is_build_successful(commit_node):
+                    is_failed, from_verified = self.is_build_failed_with_verification(commit_node)
+                    is_successful, to_verified = self.is_build_successful_with_verification(commit_node)
+                    
+                    if is_failed:
+                        last_bad_commit = (commit_node, from_verified)
+                    elif is_successful:
                         if last_bad_commit:
-                            bad_commit = last_bad_commit["commit"]
+                            bad_commit_node, bad_verified = last_bad_commit
+                            bad_commit = bad_commit_node["commit"]
                             pair = {
-                                "pr_id": pr_number,
                                 "repo_url": f"https://github.com/{self.owner}/{self.name}",
+                                "pr_id": pr_number,
                                 "from_commit": bad_commit["oid"],
-                                "from_msg": bad_commit["message"].split('\n')[0],
                                 "from_date": bad_commit["committedDate"],
+                                "from_verified": bad_verified,
                                 "to_commit": oid,
                                 "to_msg": pr_description,
                                 "to_date": commit["committedDate"],
-                                "files_changed": [],  # Not available for PR-based mining; can be populated by classification
+                                "to_verified": to_verified,
+                                "files_changed": [],  # Will be populated by classification
+                                "summary": None,
                                 "category": None,
                                 "tags": [],
                                 "error": None

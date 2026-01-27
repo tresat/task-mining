@@ -159,7 +159,7 @@ class ClassificationCacheManager:
         """
         return self._cache["classifications"].get(item_id)
     
-    def set_cached_result(self, item_id: str, category: str, tags: list, error: Optional[str]):
+    def set_cached_result(self, item_id: str, category: str, tags: list, summary: Optional[str], error: Optional[str]):
         """
         Store the classification result for a specific item.
         
@@ -167,11 +167,13 @@ class ClassificationCacheManager:
             item_id: PR ID or commit hash
             category: Classification category
             tags: List of tags
+            summary: Summary text (for AI classifiers)
             error: Error message if classification failed, None otherwise
         """
         self._cache["classifications"][item_id] = {
             "category": category,
             "tags": tags,
+            "summary": summary,
             "error": error
         }
         self._save_cache()

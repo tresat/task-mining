@@ -96,20 +96,25 @@ python3 run_pipeline.py repos.txt --search-limit 100 --timeout 300
 ### JSON Format
 ```json
 {
-  "pr_id": 123,
   "repo_url": "https://github.com/owner/repo",
+  "pr_id": 123,
   "from_commit": "abc123",
-  "from_msg": "Initial implementation",
   "from_date": "2024-01-01T12:00:00Z",
+  "from_verified": true,
   "to_commit": "def456",
   "to_msg": "Fix build issue\n\nDetailed description...",
   "to_date": "2024-01-02T12:00:00Z",
-  "files_changed": [...],
+  "to_verified": true,
+  "files_changed": ["file1.txt", "file2.txt", "file3.txt"],
+  "summary": "Fix build issue by updating dependencies and configuration",
   "category": "Dependency Update",
   "tags": ["dependencies", "version-update"],
   "error": null
 }
 ```
+
+**Field Descriptions:**
+- `from_verified` / `to_verified`: Boolean indicating whether build status was actually verified (true) or assumed due to `--allow-missing-status` (false)
 
 ### Dashboard
 

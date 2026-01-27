@@ -194,6 +194,35 @@ class CommitMiner:
         else:
             # By default, assume it's NOT a success (we only want proven successes)
             return False
+    
+    def is_build_successful_with_verification(self, commit_data: Dict[str, Any]) -> tuple:
+        """
+        Determines if a commit build was successful and whether it was verified.
+        
+        Returns:
+            tuple: (is_successful: bool, is_verified: bool)
+                - is_successful: True if build was successful (or missing status allowed)
+                - is_verified: True if we actually found status info (not just assumed)
+        """
+        # Priority 1: StatusCheckRollup (Modern Check Runs + Statuses)
+        rollup = commit_data.get("statusCheckRollup")
+        if rollup:
+            state = rollup.get("state")
+            return (state == "SUCCESS", True)
+            
+        # Priority 2: Legacy Status
+        status = commit_data.get("status")
+        if status:
+            state = status.get("state")
+            return (state == "SUCCESS", True)
+            
+        # If no status info exists
+        if self.allow_missing_status:
+            # When allow_missing_status is enabled, treat commits without status as valid but not verified
+            return (True, False)
+        else:
+            # By default, assume it's NOT a success (we only want proven successes)
+            return (False, False)
 
     def get_commit_diff(self, commit_sha: str) -> Optional[Dict[str, Any]]:
         """Fetches the diff for a commit using REST API."""
@@ -281,7 +310,8 @@ class CommitMiner:
                 msg = commit["message"].split('\n')[0]
                 
                 # Check if current commit has successful build
-                if not self.is_build_successful(commit):
+                to_successful, to_verified = self.is_build_successful_with_verification(commit)
+                if not to_successful:
                     processed_count += 1
                     continue
                 
@@ -292,7 +322,8 @@ class CommitMiner:
                     continue
                 
                 parent = parents[0]
-                if not self.is_build_successful(parent):
+                from_successful, from_verified = self.is_build_successful_with_verification(parent)
+                if not from_successful:
                     processed_count += 1
                     continue
                 
@@ -300,15 +331,17 @@ class CommitMiner:
                 
                 # Create result entry - CommitMiner only checks for successful builds
                 result = {
-                    "pr_id": None,  # Not available for commit-based mining
                     "repo_url": f"https://github.com/{self.owner}/{self.name}",
+                    "pr_id": None,  # Not available for commit-based mining
                     "from_commit": parent_oid,
-                    "from_msg": "",  # Parent message not available without additional API call
                     "from_date": parent.get("committedDate", ""),
+                    "from_verified": from_verified,
                     "to_commit": oid,
                     "to_msg": msg,
                     "to_date": commit["committedDate"],
+                    "to_verified": to_verified,
                     "files_changed": [],  # Will be populated by classifier
+                    "summary": None,
                     "category": None,
                     "tags": [],
                     "error": None
@@ -404,7 +437,8 @@ class CommitMiner:
                 msg = commit["message"].split('\n')[0]
                 
                 # Check if current commit has successful build
-                if not self.is_build_successful(commit):
+                to_successful, to_verified = self.is_build_successful_with_verification(commit)
+                if not to_successful:
                     continue
                 
                 # Check if parent commit has successful build
@@ -413,22 +447,25 @@ class CommitMiner:
                     continue
                 
                 parent = parents[0]
-                if not self.is_build_successful(parent):
+                from_successful, from_verified = self.is_build_successful_with_verification(parent)
+                if not from_successful:
                     continue
                 
                 parent_oid = parent["oid"]
                 
                 # Create result entry - CommitMiner only checks for successful builds
                 result = {
-                    "pr_id": None,  # Not available for commit-based mining
                     "repo_url": f"https://github.com/{self.owner}/{self.name}",
+                    "pr_id": None,  # Not available for commit-based mining
                     "from_commit": parent_oid,
-                    "from_msg": "",  # Parent message not available without additional API call
                     "from_date": parent.get("committedDate", ""),
+                    "from_verified": from_verified,
                     "to_commit": oid,
                     "to_msg": msg,
                     "to_date": commit["committedDate"],
+                    "to_verified": to_verified,
                     "files_changed": [],  # Will be populated by classifier
+                    "summary": None,
                     "category": None,
                     "tags": [],
                     "error": None
