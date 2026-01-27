@@ -107,7 +107,7 @@ class TestClassificationCacheManager(unittest.TestCase):
         self.assertIsNone(manager.get_cached_result(test_item_id))
         
         # Set the result
-        manager.set_cached_result(test_item_id, test_category, test_tags, test_error)
+        manager.set_cached_result(test_item_id, test_category, test_tags, None, test_error)
         
         # Now should return the result
         result = manager.get_cached_result(test_item_id)
@@ -124,7 +124,7 @@ class TestClassificationCacheManager(unittest.TestCase):
         manager1 = ClassificationCacheManager("test", self.test_owner, self.test_repo)
         manager1.cache_dir = self.test_cache_dir
         manager1.cache_file = cache_file
-        manager1.set_cached_result("item1", "Bug Fix", ["tests"], None)
+        manager1.set_cached_result("item1", "Bug Fix", ["tests"], None, None)
         
         # Create new manager and verify it loads the cache
         manager2 = ClassificationCacheManager("test", self.test_owner, self.test_repo)
@@ -146,8 +146,8 @@ class TestClassificationCacheManager(unittest.TestCase):
         # Add some items and set hash
         test_hash = "abc123"
         manager.check_and_update_hash(test_hash)
-        manager.set_cached_result("item1", "Feature", [], None)
-        manager.set_cached_result("item2", "Bug Fix", [], None)
+        manager.set_cached_result("item1", "Feature", [], None, None)
+        manager.set_cached_result("item2", "Bug Fix", [], None, None)
         
         # Clear cache
         manager.clear_cache()
@@ -166,8 +166,8 @@ class TestClassificationCacheManager(unittest.TestCase):
         # Set initial hash and add classifications
         hash1 = "hash1"
         manager.check_and_update_hash(hash1)
-        manager.set_cached_result("item1", "Feature", [], None)
-        manager.set_cached_result("item2", "Bug Fix", [], None)
+        manager.set_cached_result("item1", "Feature", [], None, None)
+        manager.set_cached_result("item2", "Bug Fix", [], None, None)
         
         # Verify items exist
         self.assertIsNotNone(manager.get_cached_result("item1"))
