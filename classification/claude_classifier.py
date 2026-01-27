@@ -81,8 +81,7 @@ Summary: [brief summary in 3 sentences or less]"""
             
             # Parse category
             category = "Other"
-            for line in answer.split('
-'):
+            for line in answer.split('\n'):
                 if line.lower().startswith('category:'):
                     cat_text = line.split(':', 1)[1].strip()
                     for category_name in self.categories.keys():
@@ -93,8 +92,7 @@ Summary: [brief summary in 3 sentences or less]"""
             
             # Parse tags
             tags = []
-            for line in answer.split('
-'):
+            for line in answer.split('\n'):
                 if line.lower().startswith('tags:'):
                     tags_text = line.split(':', 1)[1].strip()
                     if tags_text.lower() != 'none' and tags_text != '[]':
@@ -112,8 +110,7 @@ Summary: [brief summary in 3 sentences or less]"""
             summary = message  # Default to message if summary not found
             summary_lines = []
             in_summary = False
-            for line in answer.split('
-'):
+            for line in answer.split('\n'):
                 if line.lower().startswith('summary:'):
                     summary_text = line.split(':', 1)[1].strip()
                     if summary_text:
