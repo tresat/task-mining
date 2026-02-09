@@ -1,6 +1,7 @@
 import unittest
 import os
 import sys
+from unittest.mock import patch, MagicMock
 
 # Add parent directory to path to allow importing mining package
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -43,6 +44,29 @@ class TestPRMiner(unittest.TestCase):
         # Since the loop is inside `mine`, we'll rely on the live test for full flow,
         # and these unit tests for the helper predicates.
         pass
+    
+    @patch('mining.mine_prs.requests.get')
+    def test_get_patch_success(self, mock_get):
+        """Test successful patch fetching"""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.text = "diff --git a/file.txt b/file.txt\n--- a/file.txt\n+++ b/file.txt"
+        mock_get.return_value = mock_response
+        
+        patch = self.miner.get_patch("abc123", "def456")
+        self.assertIn("diff --git", patch)
+        self.assertTrue(len(patch) > 0)
+    
+    @patch('mining.mine_prs.requests.get')
+    def test_get_patch_failure(self, mock_get):
+        """Test patch fetching with API error"""
+        mock_response = MagicMock()
+        mock_response.status_code = 404
+        mock_response.raise_for_status = MagicMock(side_effect=Exception("Not found"))
+        mock_get.return_value = mock_response
+        
+        patch = self.miner.get_patch("abc123", "def456")
+        self.assertEqual(patch, "")
 
 if __name__ == '__main__':
     unittest.main()
