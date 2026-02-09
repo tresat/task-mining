@@ -1219,10 +1219,11 @@ def generate_dashboard_html(raw_data):
 
             // Transform data to benchmark format
             const transformedData = selectedData.map(item => {{
-                const repoUrl = item.repo_url || '';
+                // Try repo_url first, then fall back to pr_url for extracting repo info
+                const repoUrl = item.repo_url || item.pr_url || '';
                 const repoMatch = repoUrl.match(/github\\.com\\/([^\\/]+)\\/([^\\/]+)/);
                 const owner = repoMatch ? repoMatch[1] : '';
-                const repoName = repoMatch ? repoMatch[2] : '';
+                const repoName = repoMatch ? repoMatch[2].replace(/\\.git$/, '') : '';
                 
                 // Handle both from_commit/to_commit and bad_commit/good_commit formats
                 const fromCommit = item.from_commit || item.bad_commit || '';
@@ -1235,11 +1236,16 @@ def generate_dashboard_html(raw_data):
                 
                 const repo = owner && repoName ? `${{owner}}/${{repoName}}` : '';
                 
+                // Construct the base repo URL from owner/repo if we have them
+                const baseRepoUrl = owner && repoName ? `https://github.com/${{owner}}/${{repoName}}` : repoUrl.replace(/\\/(pull|commit)\\/.*$/, '');
+                
                 let issueUrl = '';
-                if (item.pr_id && repoUrl) {{
-                    issueUrl = `${{repoUrl}}/pull/${{item.pr_id}}`;
-                }} else if (repoUrl && fromCommit) {{
-                    issueUrl = `${{repoUrl}}/commit/${{fromCommit}}`;
+                if (item.pr_id && baseRepoUrl) {{
+                    issueUrl = `${{baseRepoUrl}}/pull/${{item.pr_id}}`;
+                }} else if (item.pr_url) {{
+                    issueUrl = item.pr_url;
+                }} else if (baseRepoUrl && fromCommit) {{
+                    issueUrl = `${{baseRepoUrl}}/commit/${{fromCommit}}`;
                 }}
                 
                 return {{
