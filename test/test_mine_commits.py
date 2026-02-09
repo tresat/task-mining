@@ -74,6 +74,29 @@ class TestCommitMiner(unittest.TestCase):
         
         result = self.miner.get_default_branch()
         self.assertEqual(result, "refs/heads/master")
+    
+    @patch('mining.mine_commits.requests.get')
+    def test_get_patch_success(self, mock_get):
+        """Test successful patch fetching"""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.text = "diff --git a/file.txt b/file.txt\n--- a/file.txt\n+++ b/file.txt"
+        mock_get.return_value = mock_response
+        
+        patch = self.miner.get_patch("abc123", "def456")
+        self.assertIn("diff --git", patch)
+        self.assertTrue(len(patch) > 0)
+    
+    @patch('mining.mine_commits.requests.get')
+    def test_get_patch_failure(self, mock_get):
+        """Test patch fetching with API error"""
+        mock_response = MagicMock()
+        mock_response.status_code = 404
+        mock_response.raise_for_status = MagicMock(side_effect=Exception("Not found"))
+        mock_get.return_value = mock_response
+        
+        patch = self.miner.get_patch("abc123", "def456")
+        self.assertEqual(patch, "")
 
 class TestProcessRepo(unittest.TestCase):
     """Test the process_repo function for handling single repos and file lists"""

@@ -85,6 +85,7 @@ class PRMiner:
         self.name = repo_name
         self.headers = {"Authorization": f"Bearer {token}"}
         self.api_url = "https://api.github.com/graphql"
+        self.rest_api_url = "https://api.github.com"
 
     def _query(self, query: str, variables: Dict[str, Any]) -> Dict[str, Any]:
         """Executes a GraphQL query with retry logic."""
@@ -117,6 +118,40 @@ class PRMiner:
                 print(f"Request failed: {e}. Retrying in {wait_time}s...")
                 time.sleep(wait_time)
         raise Exception("Max retries exceeded")
+
+    def get_patch(self, from_commit: str, to_commit: str) -> str:
+        """
+        Fetches the patch/diff between two commits using GitHub REST API.
+        Returns unified diff format as a string.
+        """
+        url = f"{self.rest_api_url}/repos/{self.owner}/{self.name}/compare/{from_commit}...{to_commit}"
+        try:
+            # Request diff format using Accept header
+            headers = self.headers.copy()
+            headers["Accept"] = "application/vnd.github.v3.diff"
+            
+            max_retries = 5
+            for attempt in range(max_retries):
+                try:
+                    response = requests.get(url, headers=headers, timeout=30)
+                    if response.status_code == 200:
+                        return response.text
+                    elif response.status_code in [502, 503, 504, 403]:
+                        wait_time = 2 ** attempt
+                        print(f"API Error {response.status_code} fetching patch. Retrying in {wait_time}s...")
+                        time.sleep(wait_time)
+                    else:
+                        response.raise_for_status()
+                except requests.RequestException as e:
+                    wait_time = 2 ** attempt
+                    print(f"Request failed fetching patch: {e}. Retrying in {wait_time}s...")
+                    time.sleep(wait_time)
+            
+            print(f"Max retries exceeded fetching patch for {from_commit}...{to_commit}")
+            return ""
+        except Exception as e:
+            print(f"Error fetching patch for {from_commit}...{to_commit}: {e}")
+            return ""
 
     def is_build_successful(self, commit_node: Dict[str, Any]) -> bool:
         """
@@ -326,6 +361,10 @@ class PRMiner:
                         if last_bad_commit:
                             bad_commit_node, bad_verified = last_bad_commit
                             bad_commit = bad_commit_node["commit"]
+                            
+                            # Fetch patch between commits
+                            patch = self.get_patch(bad_commit["oid"], oid)
+                            
                             pair = {
                                 "repo_url": f"https://github.com/{self.owner}/{self.name}",
                                 "pr_id": pr_number,
@@ -340,6 +379,7 @@ class PRMiner:
                                 "summary": None,
                                 "category": None,
                                 "tags": [],
+                                "patch": patch,
                                 "error": None
                             }
                             # Check for duplicates before adding
@@ -462,6 +502,10 @@ class PRMiner:
                         if last_bad_commit:
                             bad_commit_node, bad_verified = last_bad_commit
                             bad_commit = bad_commit_node["commit"]
+                            
+                            # Fetch patch between commits
+                            patch = self.get_patch(bad_commit["oid"], oid)
+                            
                             pair = {
                                 "repo_url": f"https://github.com/{self.owner}/{self.name}",
                                 "pr_id": pr_number,
@@ -476,6 +520,7 @@ class PRMiner:
                                 "summary": None,
                                 "category": None,
                                 "tags": [],
+                                "patch": patch,
                                 "error": None
                             }
                             # Check for duplicates before adding
