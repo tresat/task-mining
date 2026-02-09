@@ -233,6 +233,40 @@ class CommitMiner:
         except Exception as e:
             print(f"Error fetching diff for {commit_sha}: {e}")
             return None
+    
+    def get_patch(self, from_commit: str, to_commit: str) -> str:
+        """
+        Fetches the patch/diff between two commits using GitHub REST API.
+        Returns unified diff format as a string.
+        """
+        url = f"{self.rest_api_url}/repos/{self.owner}/{self.name}/compare/{from_commit}...{to_commit}"
+        try:
+            # Request diff format using Accept header
+            headers = self.headers.copy()
+            headers["Accept"] = "application/vnd.github.v3.diff"
+            
+            max_retries = 5
+            for attempt in range(max_retries):
+                try:
+                    response = requests.get(url, headers=headers, timeout=30)
+                    if response.status_code == 200:
+                        return response.text
+                    elif response.status_code in [502, 503, 504, 403]:
+                        wait_time = 2 ** attempt
+                        print(f"API Error {response.status_code} fetching patch. Retrying in {wait_time}s...")
+                        time.sleep(wait_time)
+                    else:
+                        response.raise_for_status()
+                except requests.RequestException as e:
+                    wait_time = 2 ** attempt
+                    print(f"Request failed fetching patch: {e}. Retrying in {wait_time}s...")
+                    time.sleep(wait_time)
+            
+            print(f"Max retries exceeded fetching patch for {from_commit}...{to_commit}")
+            return ""
+        except Exception as e:
+            print(f"Error fetching patch for {from_commit}...{to_commit}: {e}")
+            return ""
 
     def load_state(self, state_file: str) -> Optional[str]:
         if os.path.exists(state_file):
@@ -329,6 +363,9 @@ class CommitMiner:
                 
                 parent_oid = parent["oid"]
                 
+                # Fetch patch between commits
+                patch = self.get_patch(parent_oid, oid)
+                
                 # Create result entry - CommitMiner only checks for successful builds
                 result = {
                     "repo_url": f"https://github.com/{self.owner}/{self.name}",
@@ -344,6 +381,7 @@ class CommitMiner:
                     "summary": None,
                     "category": None,
                     "tags": [],
+                    "patch": patch,
                     "error": None
                 }
                 
@@ -453,6 +491,9 @@ class CommitMiner:
                 
                 parent_oid = parent["oid"]
                 
+                # Fetch patch between commits
+                patch = self.get_patch(parent_oid, oid)
+                
                 # Create result entry - CommitMiner only checks for successful builds
                 result = {
                     "repo_url": f"https://github.com/{self.owner}/{self.name}",
@@ -468,6 +509,7 @@ class CommitMiner:
                     "summary": None,
                     "category": None,
                     "tags": [],
+                    "patch": patch,
                     "error": None
                 }
                 

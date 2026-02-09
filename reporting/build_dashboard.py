@@ -1257,7 +1257,7 @@ def generate_dashboard_html(raw_data):
                     version: '1.0.0',
                     issue_url: issueUrl,
                     pr_url: issueUrl,
-                    patch: '',
+                    patch: item.patch || '',
                     test_patch: '',
                     created_at: toDate,
                     FAIL_TO_PASS: [],
