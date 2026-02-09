@@ -1217,8 +1217,50 @@ def generate_dashboard_html(raw_data):
                 .map(index => filteredData[index])
                 .filter(item => item !== undefined);
 
+            // Transform data to benchmark format
+            const transformedData = selectedData.map(item => {{
+                const repoUrl = item.repo_url || '';
+                const repoMatch = repoUrl.match(/github\\.com\\/([^\\/]+)\\/([^\\/]+)/);
+                const owner = repoMatch ? repoMatch[1] : '';
+                const repoName = repoMatch ? repoMatch[2] : '';
+                
+                // Handle both from_commit/to_commit and bad_commit/good_commit formats
+                const fromCommit = item.from_commit || item.bad_commit || '';
+                const toDate = item.to_date || '';
+                const summary = item.summary || item.bad_msg || item.to_msg || '';
+                
+                const issueId = item.pr_id || fromCommit;
+                const instanceId = owner && repoName && issueId ? 
+                    `${{owner}}__${{repoName}}-${{issueId}}` : '';
+                
+                const repo = owner && repoName ? `${{owner}}/${{repoName}}` : '';
+                
+                let issueUrl = '';
+                if (item.pr_id && repoUrl) {{
+                    issueUrl = `${{repoUrl}}/pull/${{item.pr_id}}`;
+                }} else if (repoUrl && fromCommit) {{
+                    issueUrl = `${{repoUrl}}/commit/${{fromCommit}}`;
+                }}
+                
+                return {{
+                    instance_id: instanceId,
+                    repo: repo,
+                    issue_id: issueId,
+                    base_commit: fromCommit,
+                    problem_statement: summary || 'No description available',
+                    version: '1.0.0',
+                    issue_url: issueUrl,
+                    pr_url: issueUrl,
+                    patch: '',
+                    test_patch: '',
+                    created_at: toDate,
+                    FAIL_TO_PASS: [],
+                    PASS_TO_PASS: []
+                }};
+            }});
+
             // Create JSON blob
-            const jsonStr = JSON.stringify(selectedData, null, 2);
+            const jsonStr = JSON.stringify(transformedData, null, 2);
             const blob = new Blob([jsonStr], {{ type: 'application/json' }});
             
             // Create download link
