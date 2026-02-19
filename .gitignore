@@ -8,3 +8,6 @@ results/
 .cache/
 # Root dashboard.html should not be committed (use results/dashboard.html instead)
 /dashboard.html
+
+# OS specific files
+.DS_Store
