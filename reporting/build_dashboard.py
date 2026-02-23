@@ -372,6 +372,14 @@ def generate_dashboard_html(raw_data):
             flex-shrink: 0;
         }}
 
+        .verified-checkbox {{
+            width: 1rem;
+            height: 1rem;
+            cursor: default;
+            accent-color: #34d399;
+            flex-shrink: 0;
+        }}
+
         .result-title-wrapper {{
             display: flex;
             align-items: start;
@@ -1121,6 +1129,7 @@ def generate_dashboard_html(raw_data):
                     <div class="result-card" data-index="${{index}}">
                         <div class="result-header">
                             <div class="result-title-wrapper">
+                                <input type="checkbox" ${{result.to_verified ? 'checked' : ''}} disabled class="verified-checkbox" title="${{result.to_verified ? 'Verified build status' : 'Build status not verified'}}" aria-label="${{result.to_verified ? 'Verified build status' : 'Build status not verified'}}">
                                 <a href="${{link}}" target="_blank" class="result-title">${{title}}</a>
                             </div>
                             <input type="checkbox" class="result-checkbox" id="${{resultId}}" onchange="toggleSelection(${{index}})" ${{selectedItems.has(index) ? 'checked' : ''}}>
@@ -1128,11 +1137,10 @@ def generate_dashboard_html(raw_data):
                         <div class="result-meta">
                             <div class="result-meta-left">
                                 <span class="result-meta-item">📦 ${{repoName}}</span>
-                                ${{prLink ? `<span class="result-meta-item">PR ${{prLink}}</span>` : ''}}
                                 ${{result.to_date ? `<span class="result-meta-item">📅 ${{new Date(result.to_date).toLocaleDateString()}}</span>` : ''}}
+                                ${{badges}}
                             </div>
                         </div>
-                        <div class="badges">${{badges}}</div>
                         ${{summary || filesDetailInfo ? `
                         <div class="tab-container">
                             <button class="tab-button active" onclick="switchTab(event, '${{resultId}}', 'summary')">Summary</button>
