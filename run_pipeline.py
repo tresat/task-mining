@@ -125,14 +125,15 @@ def run_mining(repo, search_limit, results_limit, mining_type, output_dir, state
 # Fields to clear during reclassification
 RECLASSIFY_FIELDS = ['category', 'tags', 'error']
 
-def run_classification(repo, classifier, classification_input, reclassify=False):
+def run_classification(repo, classifier, model, classification_input, reclassify=False):
     """
     Run classification based on the specified classifier.
     Edits the per_repo file in-place.
     
     Args:
         repo: Repository name
-        classifier: Type of classifier to use
+        classifier: Type of classifier to use ('simple' or 'llm')
+        model: Model name for LiteLLM (only for 'llm' classifier)
         classification_input: Path to the input file
         reclassify: If True, clears category and tags fields before classification
     """
@@ -168,43 +169,19 @@ def run_classification(repo, classifier, classification_input, reclassify=False)
             f"Running Simple Classifier for {repo}"
         )
     
-    # Gemini Classification (runs on any mining type)
-    elif classifier == "gemini":
-        # AI classifier needs analyzed results, so run simple first as prerequisite
+    # LLM Classification (runs on any mining type)
+    elif classifier == "llm":
+        # LLM classifier needs analyzed results, so run simple first as prerequisite
         run_step(
             ["python3", "-m", "classification.simple_classifier", repo, "--input", classification_input],
-            f"Running Simple Classifier for {repo} (prerequisite for Gemini)"
+            f"Running Simple Classifier for {repo} (prerequisite for LLM)"
         )
-        cmd = ["python3", "-m", "classification.gemini_classifier", repo, "--input", classification_input]
+        cmd = ["python3", "-m", "classification.llm_classifier", repo, "--model", model, "--input", classification_input]
         if reclassify:
             cmd.append("--reclassify")
-        run_step(cmd, f"Running Gemini Classification for {repo}")
-    
-    # GPT Classification (runs on any mining type)
-    elif classifier == "gpt":
-        # GPT classifier needs analyzed results, so run simple first as prerequisite
-        run_step(
-            ["python3", "-m", "classification.simple_classifier", repo, "--input", classification_input],
-            f"Running Simple Classifier for {repo} (prerequisite for GPT)"
-        )
-        cmd = ["python3", "-m", "classification.gpt_classifier", repo, "--input", classification_input]
-        if reclassify:
-            cmd.append("--reclassify")
-        run_step(cmd, f"Running GPT Classification for {repo}")
-    
-    # Claude Classification (runs on any mining type)
-    elif classifier == "claude":
-        # Claude classifier needs analyzed results, so run simple first as prerequisite
-        run_step(
-            ["python3", "-m", "classification.simple_classifier", repo, "--input", classification_input],
-            f"Running Simple Classifier for {repo} (prerequisite for Claude)"
-        )
-        cmd = ["python3", "-m", "classification.claude_classifier", repo, "--input", classification_input]
-        if reclassify:
-            cmd.append("--reclassify")
-        run_step(cmd, f"Running Claude Classification for {repo}")
+        run_step(cmd, f"Running LLM Classification ({model}) for {repo}")
 
-def process_repo(repo, search_limit, results_limit, mining_type, classifier, timeout_seconds, reclassify, allow_missing_status):
+def process_repo(repo, search_limit, results_limit, mining_type, classifier, model, timeout_seconds, reclassify, allow_missing_status):
     print(f"\n*** PROCESSING REPO: {repo} ***")
     
     if "/" not in repo:
@@ -221,7 +198,7 @@ def process_repo(repo, search_limit, results_limit, mining_type, classifier, tim
     classification_input = run_mining(repo, search_limit, results_limit, mining_type, output_dir, state_dir, allow_missing_status)
     
     # Classification
-    run_classification(repo, classifier, classification_input, reclassify)
+    run_classification(repo, classifier, model, classification_input, reclassify)
 
 def aggregate_results():
     """
@@ -280,29 +257,15 @@ def validate_tokens(classifier):
     else:
         print("✓ GITHUB_TOKEN is set")
     
-    # GEMINI_API_KEY is required if using Gemini classification
-    if classifier == "gemini":
-        gemini_key = os.getenv("GEMINI_API_KEY")
-        if not gemini_key:
-            missing_tokens.append("GEMINI_API_KEY")
+    # Check for LLM API keys if using LLM classifier
+    if classifier == "llm":
+        api_keys = ["GEMINI_API_KEY", "OPENAI_API_KEY", "ANTHROPIC_API_KEY"]
+        found_key = any(os.getenv(key) for key in api_keys)
+        if not found_key:
+            print("\n! Warning: No common LLM API keys found (GEMINI_API_KEY, OPENAI_API_KEY, ANTHROPIC_API_KEY)")
+            print("  LiteLLM may still work if you've set a specific provider's key.")
         else:
-            print("✓ GEMINI_API_KEY is set")
-    
-    # OPENAI_API_KEY is required if using GPT classification
-    if classifier == "gpt":
-        openai_key = os.getenv("OPENAI_API_KEY")
-        if not openai_key:
-            missing_tokens.append("OPENAI_API_KEY")
-        else:
-            print("✓ OPENAI_API_KEY is set")
-    
-    # ANTHROPIC_API_KEY is required if using Claude classification
-    if classifier == "claude":
-        anthropic_key = os.getenv("ANTHROPIC_API_KEY")
-        if not anthropic_key:
-            missing_tokens.append("ANTHROPIC_API_KEY")
-        else:
-            print("✓ ANTHROPIC_API_KEY is set")
+            print("✓ At least one LLM API key is set")
     
     if missing_tokens:
         print(f"\n❌ Error: The following required environment variables are not set:")
@@ -311,11 +274,10 @@ def validate_tokens(classifier):
         print("\nPlease ensure you have a .env file in the project root with these variables.")
         print("Example .env format:")
         print("GITHUB_TOKEN=your_github_token_here")
-        if classifier == "gemini":
+        if classifier == "llm":
+            print("# For LiteLLM, set at least one of these:")
             print("GEMINI_API_KEY=your_gemini_api_key_here")
-        if classifier == "gpt":
             print("OPENAI_API_KEY=your_openai_api_key_here")
-        if classifier == "claude":
             print("ANTHROPIC_API_KEY=your_anthropic_api_key_here")
         sys.exit(1)
     
@@ -332,8 +294,9 @@ def main():
     parser.add_argument("--reclassify", action="store_true", help="Clear category and tags fields before re-running classification")
     parser.add_argument("--type", default="prs", choices=["prs", "commits"],
                        help="Type of mining to run (Step 1): 'prs' (PR-based bad->good) or 'commits' (commit-based pairs with successful builds). Default: prs")
-    parser.add_argument("--classifier", default="simple", choices=["simple", "gemini", "gpt", "claude"],
-                       help="Classification to run (Steps 2 and 2b): 'simple' (heuristic), 'gemini' (Google Gemini), 'gpt' (OpenAI GPT), or 'claude' (Anthropic Claude). AI classifiers automatically run simple as prerequisite. Runs on the mining results from Step 1. Default: simple")
+    parser.add_argument("--classifier", default="simple", choices=["simple", "llm"],
+                       help="Classification to run (Steps 2 and 2b): 'simple' (heuristic), or 'llm' (AI via LiteLLM). AI classifier automatically runs simple as prerequisite. Runs on the mining results from Step 1. Default: simple")
+    parser.add_argument("--model", default="gemini/gemini-2.0-flash", help="Model name for LiteLLM (only for --classifier llm). Example: 'openai/gpt-4o-mini', 'anthropic/claude-3-5-sonnet-20240620', 'gemini/gemini-2.0-flash'.")
     parser.add_argument("--allow-missing-status", action="store_true",
                        help="Allow commits without status checks (only for --type commits). Useful for repositories without CI/CD configured. "
                             "Without this flag, only commits with verified successful builds are included.")
@@ -413,7 +376,7 @@ def main():
     for repo in repos:
         try:
             with timeout_context(args.timeout, repo):
-                process_repo(repo, args.search_limit, args.results_limit, args.type, args.classifier, args.timeout, args.reclassify, args.allow_missing_status)
+                process_repo(repo, args.search_limit, args.results_limit, args.type, args.classifier, args.model, args.timeout, args.reclassify, args.allow_missing_status)
         except TimeoutError as e:
             print(f"\n{'!'*60}")
             print(f"TIMEOUT: {e}")
